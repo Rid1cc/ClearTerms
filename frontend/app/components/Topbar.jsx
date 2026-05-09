@@ -41,14 +41,15 @@ export default function Topbar({ ctaLabel = "Sign in", ctaHref = "/login" }) {
       router.replace("/login");
     }
   };
-
+/*<path strokeLinecap="round" strokeLinejoin="round" d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/> */
   return (
     <nav className="topbar reveal">
+
       <Link href="/" className="brand">
         <span className="brand__icon">
-          <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          <img src="/logo.png" alt="CT Logo" width={24} height={24}/>
         </span>
-        <span className="brand__name">ClearTerms</span>
+        <span className="brand__name"><strong>Clear</strong>Terms</span>
       </Link>
       <div className="topbar__links">
         <Link className="nav-link" href="/dashboard">Dashboard</Link>
