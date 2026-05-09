@@ -1,4 +1,4 @@
-const GEMINI_API_KEY = "AIzaSyCy2isjROpYVT3RjDQbC-SoJLSKGjwncLE";
+const GEMINI_API_KEY = "AIzaSyACt5rrm0wJpS8H4A1jEpNpUtsS-MLrw7Q";
 const API_BASE_URL = "http://localhost:3001";
 
 const JINA_COOLDOWN_MS = 30000;
@@ -33,6 +33,10 @@ async function handleMessage(message, sender) {
 
   if (message.action === "getAuthState") {
     return getAuthState();
+  }
+
+  if (message.action === "checkPhishingBlacklist") {
+    return checkPhishingBlacklist(message.url);
   }
 
   if (message.action !== "startAnalyzeJob") {
@@ -216,6 +220,37 @@ async function sendAnalysisToBackend(payload) {
     method: "POST",
     body: payload
   });
+}
+
+async function checkPhishingBlacklist(url) {
+  if (!url) {
+    return {
+      success: false,
+      blocked: false,
+      error: "Missing URL."
+    };
+  }
+
+  try {
+    const result = await rawApiFetch("/api/scan/blacklist-check", {
+      method: "POST",
+      body: { url }
+    });
+
+    return {
+      success: true,
+      blocked: Boolean(result?.blocked),
+      reason: result?.reason || null,
+      source: result?.source || null
+    };
+  } catch (error) {
+    console.warn("Phishing blacklist check failed:", error);
+    return {
+      success: false,
+      blocked: false,
+      error: error.message
+    };
+  }
 }
 
 async function apiFetch(path, options = {}) {
@@ -420,11 +455,20 @@ Oceń w skali od 1 do 100:
 
 Zwróć odpowiedź dokładnie w takim formacie:
 
+Label:
+Jedna z dokładnie tych etykiet: Dangerous! / Suspicious / Moderate / Low threat
+
 Score:
 XX/100
 
 Explanation:
-Twoje uzasadnienie po angielsku, ma byc krotkie i zwięzłe, zrozumiałe dla usera.
+Twoje uzasadnienie po angielsku, ma byc krotkie i zwięzłe, zrozumiałe dla usera, postaraj się podać tylko najważniejsze informacje.
+
+Educational note:
+Jedna krótka lekcja dla użytkownika: wyjaśnij prostym językiem, czego ta polityka uczy o prywatności online albo na co użytkownik powinien zwracać uwagę w podobnych dokumentach.
+
+User tip:
+Jedna praktyczna rada, co użytkownik może zrobić, np. sprawdzić ustawienia prywatności, ograniczyć personalizację reklam, pobrać dane, usunąć historię aktywności, wyłączyć śledzenie poza aplikacją.
 
 Nie dodawaj żadnego markdowna.
 Nie dodawaj JSON-a.

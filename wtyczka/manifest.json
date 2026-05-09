@@ -3,6 +3,12 @@
   "name": "Privacy Policy Jina Gemini Analyzer",
   "version": "1.0",
   "description": "Finds a privacy policy, fetches it through Jina, and rates it with Gemini.",
+  "icons": {
+    "16": "logo.png",
+    "32": "logo.png",
+    "48": "logo.png",
+    "128": "logo.png"
+  },
   "permissions": [
     "activeTab",
     "tabs",
@@ -17,6 +23,12 @@
     "https://generativelanguage.googleapis.com/*"
   ],
   "action": {
+    "default_icon": {
+      "16": "logo.png",
+      "32": "logo.png",
+      "48": "logo.png",
+      "128": "logo.png"
+    },
     "default_popup": "popup.html",
     "default_title": "Rate the privacy policy"
   },

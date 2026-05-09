@@ -14,6 +14,10 @@
       --accent: #6ef7c7;
       --accent-2: #67b7ff;
       --danger: #ff7b7b;
+      --danger-dark: #b91c1c;
+      --warning-orange: #f97316;
+      --warning-yellow: #facc15;
+      --safe: #22c55e;
       --font-sans: "Space Grotesk", "Segoe UI", sans-serif;
       --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
     }
@@ -61,6 +65,14 @@
       background: rgba(110, 247, 199, 0.16);
       color: var(--accent);
       font-weight: 700;
+      overflow: hidden;
+    }
+
+    .brand__icon img {
+      width: 26px;
+      height: 26px;
+      display: block;
+      object-fit: contain;
     }
 
     .brand__name {
@@ -120,6 +132,74 @@
       color: var(--text);
     }
 
+    .company-panel {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+      padding: 12px;
+      border: 1px solid var(--glass-border);
+      border-radius: 12px;
+      background: rgba(6, 12, 24, 0.45);
+    }
+
+    .company-panel__header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .company-panel h2 {
+      margin: 0;
+      font-size: 15px;
+      line-height: 1.2;
+    }
+
+    .company-panel p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .company-panel__tag {
+      padding: 3px 7px;
+      border-radius: 999px;
+      background: rgba(249, 115, 22, 0.18);
+      color: #fed7aa;
+      font-size: 11px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .incident-list {
+      display: grid;
+      gap: 8px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .incident {
+      padding: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .incident strong {
+      display: block;
+      margin-bottom: 4px;
+      color: #f8fafc;
+      font-size: 12px;
+    }
+
+    .incident span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
     .hidden {
       display: none;
     }
@@ -142,12 +222,74 @@
       white-space: pre-wrap;
       word-break: break-word;
     }
+
+    /* Highlighted tokens in the status output */
+    .status-heading {
+      display: inline-block;
+      margin-top: 8px;
+      font-size: 16px;
+      font-weight: 800;
+      color: #f8fafc;
+    }
+
+    .score {
+      font-weight: 800;
+      padding: 2px 6px;
+      border-radius: 8px;
+    }
+
+    .score--danger {
+      color: #fee2e2;
+      background: rgba(185, 28, 28, 0.42);
+      border: 1px solid rgba(248, 113, 113, 0.45);
+    }
+
+    .score--orange {
+      color: #ffedd5;
+      background: rgba(249, 115, 22, 0.32);
+      border: 1px solid rgba(251, 146, 60, 0.45);
+    }
+
+    .score--yellow {
+      color: #fef9c3;
+      background: rgba(250, 204, 21, 0.24);
+      border: 1px solid rgba(250, 204, 21, 0.45);
+    }
+
+    .score--safe {
+      color: #dcfce7;
+      background: rgba(34, 197, 94, 0.28);
+      border: 1px solid rgba(74, 222, 128, 0.45);
+    }
+
+    .verdict {
+      font-weight: 800;
+      padding: 2px 6px;
+      border-radius: 8px;
+    }
+
+    .verdict--danger {
+      color: #fecaca;
+      background: rgba(185, 28, 28, 0.28);
+    }
+
+    .verdict--orange {
+      color: #fed7aa;
+      background: rgba(249, 115, 22, 0.22);
+    }
+
+    .verdict--safe {
+      color: #bbf7d0;
+      background: rgba(34, 197, 94, 0.2);
+    }
   </style>
 </head>
 <body>
   <main class="shell">
     <div class="brand">
-      <div class="brand__icon">C</div>
+      <div class="brand__icon">
+        <img src="logo.png" alt="ClearTerms logo">
+      </div>
       <div class="brand__name">ClearTerms</div>
     </div>
 
@@ -164,8 +306,29 @@
     <div id="scanPanel" class="panel hidden">
       <div id="account"></div>
       <button id="scanBtn">Rate the privacy policy</button>
+      <button id="companyInfoBtn" class="secondary" type="button">Company info</button>
       <button id="logoutBtn" class="secondary">Log out</button>
     </div>
+
+    <section id="companyInfoPanel" class="company-panel hidden" aria-live="polite">
+      <div class="company-panel__header">
+        <div>
+          <h2>Meta / Facebook</h2>
+          <p>Mock company risk notes for the current demo.</p>
+        </div>
+        <span class="company-panel__tag">Privacy history</span>
+      </div>
+      <ul class="incident-list">
+        <li class="incident">
+          <strong>March 2018 - Cambridge Analytica scandal</strong>
+          <span>Reports revealed that data from tens of millions of Facebook users had been obtained through a third-party app and used for political profiling.</span>
+        </li>
+        <li class="incident">
+          <strong>April 3, 2021 - 533 million user records exposed online</strong>
+          <span>A dataset containing phone numbers, Facebook IDs, names, locations and other profile details resurfaced publicly; Facebook said it related to a vulnerability fixed in 2019.</span>
+        </li>
+      </ul>
+    </section>
 
     <div id="status">Ready to work!</div>
   </main>
