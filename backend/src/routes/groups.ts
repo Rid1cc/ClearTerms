@@ -200,13 +200,16 @@ export default async function groupRoutes(fastify: FastifyInstance) {
 
       // `group_members.user_id` references `auth.users`, not `user_profiles`, so PostgREST
       // cannot embed profiles in one query. Fetch rows and profiles separately.
-      const { data: rows, error } = await supabaseAdmin
+      const { data: rows, error: rowsError } = await supabaseAdmin
         .from('group_members')
         .select('user_id, role, joined_at')
         .eq('group_id', params.data.id)
         .order('joined_at', { ascending: true })
 
-      if (error) return reply.code(500).send({ error: 'Failed to fetch members' })
+      if (rowsError) {
+        request.log.error({ err: rowsError, groupId: params.data.id }, 'group_members select failed')
+        return reply.code(500).send({ error: 'Failed to fetch members', detail: rowsError.message })
+      }
 
       const membersList = rows ?? []
       const userIds = [...new Set(membersList.map((m) => m.user_id))]
@@ -222,7 +225,15 @@ export default async function groupRoutes(fastify: FastifyInstance) {
           .select('id, display_name, avatar_url')
           .in('id', userIds)
 
-        if (profilesError) return reply.code(500).send({ error: 'Failed to fetch members' })
+        if (profilesError) {
+          request.log.error(
+            { err: profilesError, userIds },
+            'user_profiles select failed'
+          )
+          return reply
+            .code(500)
+            .send({ error: 'Failed to fetch members', detail: profilesError.message })
+        }
 
         for (const p of profiles ?? []) {
           profileByUserId.set(p.id, {
@@ -230,6 +241,31 @@ export default async function groupRoutes(fastify: FastifyInstance) {
             avatar_url: p.avatar_url,
           })
         }
+      }
+
+      // Fallback display names from auth.users for users without a user_profiles row
+      // (e.g. early users created before the trigger landed).
+      const missingIds = userIds.filter((id) => !profileByUserId.has(id))
+      if (missingIds.length > 0) {
+        await Promise.all(
+          missingIds.map(async (userId) => {
+            try {
+              const { data } = await supabaseAdmin.auth.admin.getUserById(userId)
+              const u = data?.user
+              if (!u) return
+              const fallbackName =
+                (u.user_metadata as any)?.display_name ||
+                u.email?.split('@')[0] ||
+                null
+              profileByUserId.set(userId, {
+                display_name: fallbackName,
+                avatar_url: null,
+              })
+            } catch (err) {
+              request.log.warn({ err, userId }, 'fallback profile lookup failed')
+            }
+          })
+        )
       }
 
       return {
