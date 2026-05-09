@@ -1,0 +1,662 @@
+-- =====================================================================
+-- SCHEMA BAZY DANYCH — Aplikacja do analizy stron internetowych
+-- Platforma: Supabase (PostgreSQL)
+-- =====================================================================
+-- Wykonaj w Supabase SQL Editor (Dashboard → SQL Editor → New query).
+-- Zalecana kolejność: ten plik wykonuje wszystko po kolei.
+-- =====================================================================
+
+-- ---------------------------------------------------------------------
+-- ROZSZERZENIA
+-- ---------------------------------------------------------------------
+create extension if not exists "uuid-ossp";
+create extension if not exists "pgcrypto";
+
+
+-- ---------------------------------------------------------------------
+-- ENUMY
+-- ---------------------------------------------------------------------
+create type group_role as enum ('admin', 'member', 'child');
+
+create type verdict_type as enum ('safe', 'suspicious', 'phishing', 'unknown');
+
+create type data_category as enum (
+    'email',
+    'password',
+    'phone',
+    'full_name',
+    'address',
+    'date_of_birth',
+    'national_id',           -- PESEL, SSN itp.
+    'credit_card',
+    'bank_account',
+    'gps_location',
+    'ip_address',
+    'device_id',
+    'biometric',
+    'photo',
+    'browsing_history',
+    'contacts',
+    'other'
+);
+
+create type parental_event_type as enum (
+    'visit_attempted',
+    'visit_blocked',
+    'data_submitted_to_phishing',
+    'suspicious_site_visited'
+);
+
+create type phishing_source as enum (
+    'google_safe_browsing',
+    'phishtank',
+    'internal_ai',
+    'user_report'
+);
+
+create type leak_severity as enum ('low', 'medium', 'high', 'critical');
+
+
+-- =====================================================================
+-- 1. UŻYTKOWNICY
+-- =====================================================================
+-- Rozszerzenie auth.users z Supabase. Trzymamy tu profil i ustawienia.
+create table public.user_profiles (
+    id uuid primary key references auth.users(id) on delete cascade,
+    display_name text,
+    avatar_url text,
+    preferences jsonb not null default '{}'::jsonb,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now()
+);
+
+comment on table public.user_profiles is 'Profile użytkowników, rozszerzenie auth.users';
+
+
+-- =====================================================================
+-- 2. GRUPY
+-- =====================================================================
+create table public.groups (
+    id uuid primary key default uuid_generate_v4(),
+    name text not null,
+    description text,
+    created_by uuid not null references auth.users(id) on delete cascade,
+    invite_code text unique,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now()
+);
+
+create index idx_groups_created_by on public.groups(created_by);
+create index idx_groups_invite_code on public.groups(invite_code);
+
+comment on table public.groups is 'Grupy użytkowników (rodzina, zespół firmowy)';
+
+
+create table public.group_members (
+    id uuid primary key default uuid_generate_v4(),
+    group_id uuid not null references public.groups(id) on delete cascade,
+    user_id uuid not null references auth.users(id) on delete cascade,
+    role group_role not null default 'member',
+    joined_at timestamptz not null default now(),
+    unique(group_id, user_id)
+);
+
+create index idx_group_members_group on public.group_members(group_id);
+create index idx_group_members_user on public.group_members(user_id);
+create index idx_group_members_role on public.group_members(group_id, role);
+
+comment on table public.group_members is 'Członkostwo w grupach z rolami';
+
+
+-- =====================================================================
+-- 3. FIRMY (właściciele stron)
+-- =====================================================================
+-- Jedna firma może mieć wiele domen (Meta = fb.com, instagram.com, whatsapp.com).
+-- Audyt firmy liczymy raz, podpinamy pod wszystkie jej strony.
+create table public.companies (
+    id uuid primary key default uuid_generate_v4(),
+    name text not null,
+    headquarters_country text,           -- kod ISO 3166-1 alfa-2 (np. "US", "PL")
+    website text,
+    description text,
+    metadata jsonb not null default '{}'::jsonb,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now()
+);
+
+create index idx_companies_name on public.companies(name);
+create index idx_companies_country on public.companies(headquarters_country);
+
+comment on table public.companies is 'Firmy będące właścicielami analizowanych stron';
+
+
+-- =====================================================================
+-- 4. STRONY WWW (globalny cache)
+-- =====================================================================
+-- Jedna strona = jeden wpis. Globalny cache — niezależny od użytkowników.
+create table public.scanned_sites (
+    id uuid primary key default uuid_generate_v4(),
+    url text not null unique,
+    domain text not null,                 -- wyciągnięta domena dla szybkiego lookup
+    url_hash text not null unique,        -- SHA-256 znormalizowanego URL, do szybkich JOIN-ów
+    company_id uuid references public.companies(id) on delete set null,
+    last_analyzed_at timestamptz,         -- klucz dla logiki refresh (24h)
+    first_seen_at timestamptz not null default now(),
+    scan_count integer not null default 0,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now()
+);
+
+create index idx_scanned_sites_url_hash on public.scanned_sites(url_hash);
+create index idx_scanned_sites_domain on public.scanned_sites(domain);
+create index idx_scanned_sites_last_analyzed on public.scanned_sites(last_analyzed_at);
+create index idx_scanned_sites_company on public.scanned_sites(company_id);
+
+comment on table public.scanned_sites is 'Globalny cache analizowanych stron, klucz dla lazy refresh 24h';
+
+
+-- =====================================================================
+-- 5. WERDYKTY (z historią)
+-- =====================================================================
+-- 1:N do scanned_sites — trzymamy historię werdyktów.
+-- Pole is_current ułatwia szybki lookup aktualnego werdyktu.
+create table public.site_verdicts (
+    id uuid primary key default uuid_generate_v4(),
+    site_id uuid not null references public.scanned_sites(id) on delete cascade,
+    verdict verdict_type not null,
+    score integer not null check (score >= 0 and score <= 100),
+    summary text,                          -- 2-3 zdania, ludzkim językiem
+    red_flags jsonb not null default '[]'::jsonb,        -- lista stringów
+    data_processing_countries text[],      -- ["US", "IN", "PH"]
+    is_current boolean not null default true,
+    analyzed_at timestamptz not null default now(),
+    created_at timestamptz not null default now()
+);
+
+create index idx_site_verdicts_site on public.site_verdicts(site_id);
+create index idx_site_verdicts_current on public.site_verdicts(site_id) where is_current = true;
+create index idx_site_verdicts_verdict on public.site_verdicts(verdict);
+
+comment on table public.site_verdicts is 'Werdykty AI z historią. Tylko jeden wpis na site_id ma is_current=true';
+
+
+-- Trigger: gdy wstawiamy nowy werdykt, odznaczamy poprzednie jako nie-aktualne
+create or replace function set_previous_verdicts_not_current()
+returns trigger as $$
+begin
+    if new.is_current = true then
+        update public.site_verdicts
+        set is_current = false
+        where site_id = new.site_id and id != new.id and is_current = true;
+    end if;
+    return new;
+end;
+$$ language plpgsql;
+
+create trigger trg_site_verdicts_set_current
+after insert on public.site_verdicts
+for each row execute function set_previous_verdicts_not_current();
+
+
+-- =====================================================================
+-- 6. ANALIZY POLITYKI PRYWATNOŚCI / EULA
+-- =====================================================================
+create table public.privacy_policy_analyses (
+    id uuid primary key default uuid_generate_v4(),
+    site_id uuid not null references public.scanned_sites(id) on delete cascade,
+    short_summary text not null,                -- skrócony opis dla zwykłego użytkownika
+    data_collected data_category[] not null default '{}',
+    key_clauses jsonb not null default '[]'::jsonb,    -- [{title, description, severity}]
+    sells_data_to_third_parties boolean,
+    transfers_outside_eea boolean,
+    allows_account_deletion boolean,
+    raw_policy_url text,                         -- skąd wzięliśmy politykę
+    raw_policy_excerpt text,                     -- fragment oryginału (do audytu)
+    language text,                                -- język polityki (ISO 639-1)
+    is_current boolean not null default true,
+    analyzed_at timestamptz not null default now(),
+    created_at timestamptz not null default now()
+);
+
+create index idx_privacy_analyses_site on public.privacy_policy_analyses(site_id);
+create index idx_privacy_analyses_current on public.privacy_policy_analyses(site_id) where is_current = true;
+
+comment on table public.privacy_policy_analyses is 'Wyniki analizy AI polityki prywatności i EULA';
+
+
+create or replace function set_previous_privacy_analyses_not_current()
+returns trigger as $$
+begin
+    if new.is_current = true then
+        update public.privacy_policy_analyses
+        set is_current = false
+        where site_id = new.site_id and id != new.id and is_current = true;
+    end if;
+    return new;
+end;
+$$ language plpgsql;
+
+create trigger trg_privacy_analyses_set_current
+after insert on public.privacy_policy_analyses
+for each row execute function set_previous_privacy_analyses_not_current();
+
+
+-- =====================================================================
+-- 7. AUDYT FIRMY (na poziomie firmy, nie strony)
+-- =====================================================================
+create table public.company_audits (
+    id uuid primary key default uuid_generate_v4(),
+    company_id uuid not null references public.companies(id) on delete cascade,
+    known_breaches_count integer not null default 0,
+    regulatory_fines_count integer not null default 0,
+    incidents_timeline jsonb not null default '[]'::jsonb,
+    -- przykładowy element: {date, title, description, severity, source_url}
+    sources jsonb not null default '[]'::jsonb,         -- lista URL-i źródeł
+    reliability_score integer check (reliability_score >= 0 and reliability_score <= 100),
+    last_researched_at timestamptz not null default now(),
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now(),
+    unique(company_id)
+);
+
+create index idx_company_audits_company on public.company_audits(company_id);
+create index idx_company_audits_score on public.company_audits(reliability_score);
+
+comment on table public.company_audits is 'Audyt rzetelności firmy - jeden rekord per firma, aktualizowany';
+
+
+-- =====================================================================
+-- 8. HISTORIA SKANÓW (per użytkownik)
+-- =====================================================================
+create table public.scan_history (
+    id uuid primary key default uuid_generate_v4(),
+    user_id uuid not null references auth.users(id) on delete cascade,
+    site_id uuid not null references public.scanned_sites(id) on delete cascade,
+    verdict_id uuid references public.site_verdicts(id) on delete set null,  -- werdykt zwrócony użytkownikowi w tym momencie
+    scanned_at timestamptz not null default now(),
+    triggered_refresh boolean not null default false      -- czy ten skan wywołał ponowną analizę
+);
+
+create index idx_scan_history_user on public.scan_history(user_id);
+create index idx_scan_history_site on public.scan_history(site_id);
+create index idx_scan_history_user_time on public.scan_history(user_id, scanned_at desc);
+
+comment on table public.scan_history is 'Log skanów per użytkownik (kto, kiedy, jaką stronę)';
+
+
+-- =====================================================================
+-- 9. LOG PRZEKAZANYCH DANYCH (dla detekcji wycieków)
+-- =====================================================================
+-- WAŻNE: NIGDY nie zapisujemy WARTOŚCI danych. Tylko KATEGORIE.
+create table public.submitted_data_log (
+    id uuid primary key default uuid_generate_v4(),
+    user_id uuid not null references auth.users(id) on delete cascade,
+    site_id uuid references public.scanned_sites(id) on delete set null,
+    site_url text not null,                       -- duplikujemy URL na wypadek braku site_id
+    data_categories data_category[] not null,
+    submitted_at timestamptz not null default now()
+);
+
+create index idx_submitted_data_user on public.submitted_data_log(user_id);
+create index idx_submitted_data_site on public.submitted_data_log(site_id);
+create index idx_submitted_data_user_time on public.submitted_data_log(user_id, submitted_at desc);
+
+comment on table public.submitted_data_log is
+    'Log kategorii danych przekazanych stronom. UWAGA: bez wartości, tylko kategorie!';
+
+
+-- =====================================================================
+-- 10. ALERTY O WYCIEKACH
+-- =====================================================================
+-- Generowane gdy strona, której coś przekazaliśmy, okaże się phishingiem.
+create table public.leak_alerts (
+    id uuid primary key default uuid_generate_v4(),
+    user_id uuid not null references auth.users(id) on delete cascade,
+    submitted_data_log_id uuid not null references public.submitted_data_log(id) on delete cascade,
+    site_id uuid references public.scanned_sites(id) on delete set null,
+    site_url text not null,
+    data_categories data_category[] not null,
+    severity leak_severity not null,
+    message text,
+    detected_at timestamptz not null default now(),
+    acknowledged_at timestamptz,
+    created_at timestamptz not null default now()
+);
+
+create index idx_leak_alerts_user on public.leak_alerts(user_id);
+create index idx_leak_alerts_user_unack on public.leak_alerts(user_id) where acknowledged_at is null;
+create index idx_leak_alerts_severity on public.leak_alerts(severity);
+
+comment on table public.leak_alerts is 'Alerty o danych przekazanych stronie później zidentyfikowanej jako phishing';
+
+
+-- =====================================================================
+-- 11. BLACKLISTA PHISHINGOWA (źródła zewnętrzne)
+-- =====================================================================
+create table public.phishing_blacklist (
+    id uuid primary key default uuid_generate_v4(),
+    url text,
+    domain text,
+    url_hash text,
+    source phishing_source not null,
+    reason text,
+    is_active boolean not null default true,
+    added_at timestamptz not null default now(),
+    expires_at timestamptz
+);
+
+create index idx_phishing_blacklist_url_hash on public.phishing_blacklist(url_hash) where is_active = true;
+create index idx_phishing_blacklist_domain on public.phishing_blacklist(domain) where is_active = true;
+create index idx_phishing_blacklist_source on public.phishing_blacklist(source);
+
+comment on table public.phishing_blacklist is 'Blacklista phishingowa z zewnętrznych źródeł (Google Safe Browsing, PhishTank, AI)';
+
+
+-- =====================================================================
+-- 12. ZGŁOSZENIA OD UŻYTKOWNIKÓW
+-- =====================================================================
+create table public.user_phishing_reports (
+    id uuid primary key default uuid_generate_v4(),
+    reported_by uuid not null references auth.users(id) on delete cascade,
+    url text not null,
+    domain text not null,
+    reason text,
+    status text not null default 'pending',     -- pending, confirmed, rejected
+    reviewed_by uuid references auth.users(id) on delete set null,
+    reviewed_at timestamptz,
+    created_at timestamptz not null default now()
+);
+
+create index idx_user_phishing_reports_status on public.user_phishing_reports(status);
+create index idx_user_phishing_reports_user on public.user_phishing_reports(reported_by);
+
+comment on table public.user_phishing_reports is 'Zgłoszenia phishingu od użytkowników, wymagają moderacji';
+
+
+-- =====================================================================
+-- 13. ALERTY KONTROLI RODZICIELSKIEJ
+-- =====================================================================
+create table public.parental_alerts (
+    id uuid primary key default uuid_generate_v4(),
+    group_id uuid not null references public.groups(id) on delete cascade,
+    child_user_id uuid not null references auth.users(id) on delete cascade,
+    site_id uuid references public.scanned_sites(id) on delete set null,
+    site_url text not null,
+    event_type parental_event_type not null,
+    details jsonb not null default '{}'::jsonb,
+    occurred_at timestamptz not null default now(),
+    acknowledged_at timestamptz,
+    created_at timestamptz not null default now()
+);
+
+create index idx_parental_alerts_group on public.parental_alerts(group_id);
+create index idx_parental_alerts_child on public.parental_alerts(child_user_id);
+create index idx_parental_alerts_unack on public.parental_alerts(group_id) where acknowledged_at is null;
+
+comment on table public.parental_alerts is 'Alerty dla administratorów grupy o aktywności podopiecznych';
+
+
+-- =====================================================================
+-- TRIGGERY updated_at
+-- =====================================================================
+create or replace function update_updated_at()
+returns trigger as $$
+begin
+    new.updated_at = now();
+    return new;
+end;
+$$ language plpgsql;
+
+create trigger trg_user_profiles_updated before update on public.user_profiles
+    for each row execute function update_updated_at();
+create trigger trg_groups_updated before update on public.groups
+    for each row execute function update_updated_at();
+create trigger trg_companies_updated before update on public.companies
+    for each row execute function update_updated_at();
+create trigger trg_scanned_sites_updated before update on public.scanned_sites
+    for each row execute function update_updated_at();
+create trigger trg_company_audits_updated before update on public.company_audits
+    for each row execute function update_updated_at();
+
+
+-- =====================================================================
+-- ROW LEVEL SECURITY
+-- =====================================================================
+alter table public.user_profiles enable row level security;
+alter table public.groups enable row level security;
+alter table public.group_members enable row level security;
+alter table public.companies enable row level security;
+alter table public.scanned_sites enable row level security;
+alter table public.site_verdicts enable row level security;
+alter table public.privacy_policy_analyses enable row level security;
+alter table public.company_audits enable row level security;
+alter table public.scan_history enable row level security;
+alter table public.submitted_data_log enable row level security;
+alter table public.leak_alerts enable row level security;
+alter table public.phishing_blacklist enable row level security;
+alter table public.user_phishing_reports enable row level security;
+alter table public.parental_alerts enable row level security;
+
+
+-- ----- user_profiles -----
+create policy "users can view own profile"
+    on public.user_profiles for select
+    using (auth.uid() = id);
+
+create policy "users can update own profile"
+    on public.user_profiles for update
+    using (auth.uid() = id);
+
+create policy "users can insert own profile"
+    on public.user_profiles for insert
+    with check (auth.uid() = id);
+
+
+-- ----- groups -----
+create policy "members can view their groups"
+    on public.groups for select
+    using (
+        exists (
+            select 1 from public.group_members
+            where group_members.group_id = groups.id
+              and group_members.user_id = auth.uid()
+        )
+    );
+
+create policy "users can create groups"
+    on public.groups for insert
+    with check (auth.uid() = created_by);
+
+create policy "admins can update their groups"
+    on public.groups for update
+    using (
+        exists (
+            select 1 from public.group_members
+            where group_members.group_id = groups.id
+              and group_members.user_id = auth.uid()
+              and group_members.role = 'admin'
+        )
+    );
+
+create policy "admins can delete their groups"
+    on public.groups for delete
+    using (
+        exists (
+            select 1 from public.group_members
+            where group_members.group_id = groups.id
+              and group_members.user_id = auth.uid()
+              and group_members.role = 'admin'
+        )
+    );
+
+
+-- ----- group_members -----
+create policy "members can view fellow members"
+    on public.group_members for select
+    using (
+        exists (
+            select 1 from public.group_members gm
+            where gm.group_id = group_members.group_id
+              and gm.user_id = auth.uid()
+        )
+    );
+
+create policy "admins can add members"
+    on public.group_members for insert
+    with check (
+        exists (
+            select 1 from public.group_members
+            where group_members.group_id = group_members.group_id
+              and group_members.user_id = auth.uid()
+              and group_members.role = 'admin'
+        )
+        or auth.uid() = user_id  -- użytkownik może sam dołączyć (przez invite_code)
+    );
+
+create policy "admins can remove members"
+    on public.group_members for delete
+    using (
+        exists (
+            select 1 from public.group_members gm
+            where gm.group_id = group_members.group_id
+              and gm.user_id = auth.uid()
+              and gm.role = 'admin'
+        )
+        or auth.uid() = user_id  -- użytkownik może sam wyjść z grupy
+    );
+
+
+-- ----- companies, scanned_sites, site_verdicts, privacy_policy_analyses, company_audits -----
+-- Dane publiczne - każdy zalogowany może je czytać
+-- Zapis tylko przez service_role (backend), więc nie tworzymy policy INSERT/UPDATE dla użytkowników
+
+create policy "authenticated can read companies"
+    on public.companies for select
+    using (auth.role() = 'authenticated');
+
+create policy "authenticated can read scanned_sites"
+    on public.scanned_sites for select
+    using (auth.role() = 'authenticated');
+
+create policy "authenticated can read site_verdicts"
+    on public.site_verdicts for select
+    using (auth.role() = 'authenticated');
+
+create policy "authenticated can read privacy_policy_analyses"
+    on public.privacy_policy_analyses for select
+    using (auth.role() = 'authenticated');
+
+create policy "authenticated can read company_audits"
+    on public.company_audits for select
+    using (auth.role() = 'authenticated');
+
+
+-- ----- scan_history -----
+create policy "users see own scan history"
+    on public.scan_history for select
+    using (auth.uid() = user_id);
+
+create policy "group admins see members scan history"
+    on public.scan_history for select
+    using (
+        exists (
+            select 1 from public.group_members admin_gm
+            join public.group_members member_gm
+              on admin_gm.group_id = member_gm.group_id
+            where admin_gm.user_id = auth.uid()
+              and admin_gm.role = 'admin'
+              and member_gm.user_id = scan_history.user_id
+        )
+    );
+
+
+-- ----- submitted_data_log -----
+create policy "users see own submitted data log"
+    on public.submitted_data_log for select
+    using (auth.uid() = user_id);
+
+create policy "group admins see members submitted data log"
+    on public.submitted_data_log for select
+    using (
+        exists (
+            select 1 from public.group_members admin_gm
+            join public.group_members member_gm
+              on admin_gm.group_id = member_gm.group_id
+            where admin_gm.user_id = auth.uid()
+              and admin_gm.role = 'admin'
+              and member_gm.user_id = submitted_data_log.user_id
+              and member_gm.role = 'child'  -- tylko dla dzieci, nie dorosłych członków
+        )
+    );
+
+
+-- ----- leak_alerts -----
+create policy "users see own leak alerts"
+    on public.leak_alerts for select
+    using (auth.uid() = user_id);
+
+create policy "users update own leak alerts"
+    on public.leak_alerts for update
+    using (auth.uid() = user_id);
+
+
+-- ----- phishing_blacklist -----
+create policy "authenticated can read blacklist"
+    on public.phishing_blacklist for select
+    using (auth.role() = 'authenticated');
+
+
+-- ----- user_phishing_reports -----
+create policy "users see own reports"
+    on public.user_phishing_reports for select
+    using (auth.uid() = reported_by);
+
+create policy "users create reports"
+    on public.user_phishing_reports for insert
+    with check (auth.uid() = reported_by);
+
+
+-- ----- parental_alerts -----
+create policy "group admins see alerts"
+    on public.parental_alerts for select
+    using (
+        exists (
+            select 1 from public.group_members
+            where group_members.group_id = parental_alerts.group_id
+              and group_members.user_id = auth.uid()
+              and group_members.role = 'admin'
+        )
+    );
+
+create policy "group admins update alerts"
+    on public.parental_alerts for update
+    using (
+        exists (
+            select 1 from public.group_members
+            where group_members.group_id = parental_alerts.group_id
+              and group_members.user_id = auth.uid()
+              and group_members.role = 'admin'
+        )
+    );
+
+
+-- =====================================================================
+-- AUTOMATYCZNE TWORZENIE PROFILU PRZY REJESTRACJI
+-- =====================================================================
+create or replace function public.handle_new_user()
+returns trigger as $$
+begin
+    insert into public.user_profiles (id, display_name)
+    values (new.id, coalesce(new.raw_user_meta_data->>'display_name', new.email));
+    return new;
+end;
+$$ language plpgsql security definer;
+
+create trigger on_auth_user_created
+    after insert on auth.users
+    for each row execute function public.handle_new_user();
+
+
+-- =====================================================================
+-- KONIEC SCHEMATU
+-- =====================================================================
