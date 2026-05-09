@@ -5,6 +5,8 @@ import { config } from '../config/env'
 import { normalizeUrl } from '../utils/url'
 import { scanRequestSchema } from '../schemas/scan'
 import { analyzeUrl, AiAnalysisResult } from '../services/aiService'
+import { recordParentalAlerts, classifyVerdictForAlert } from '../services/parentalAlerts'
+import { detectLeaksForSite } from '../services/leakDetection'
 
 // ---------------------------------------------------------------------
 // Helpers
@@ -236,6 +238,7 @@ interface AssembledResponse {
   last_analyzed_at: string | null
   cached: boolean
   partial?: boolean
+  stale?: boolean
 }
 
 function assembleResponse(args: {
@@ -247,8 +250,9 @@ function assembleResponse(args: {
   lastAnalyzedAt: string | null
   cached: boolean
   partial?: boolean
+  stale?: boolean
 }): AssembledResponse {
-  const { url, verdict, privacy, company, audit, lastAnalyzedAt, cached, partial } = args
+  const { url, verdict, privacy, company, audit, lastAnalyzedAt, cached, partial, stale } = args
   return {
     url,
     verdict: verdict?.verdict ?? 'unknown',
@@ -288,7 +292,189 @@ function assembleResponse(args: {
     last_analyzed_at: lastAnalyzedAt,
     cached,
     ...(partial ? { partial: true } : {}),
+    ...(stale ? { stale: true } : {}),
   }
+}
+
+// ---------------------------------------------------------------------
+// Pełna analiza (AI + persist) — wydzielona by wywoływać ją również
+// w tle (stale-while-revalidate) z tym samym kodem co synchroniczna ścieżka.
+// ---------------------------------------------------------------------
+interface AnalysisOutput {
+  site: ScannedSiteRow
+  verdict: VerdictRow | null
+  privacy: PrivacyAnalysisRow | null
+  company: CompanyRow | null
+  audit: CompanyAuditRow | null
+  partial: boolean
+  analyzedAt: string
+}
+
+async function runFullAnalysis(
+  initialSite: ScannedSiteRow,
+  domain: string,
+  domContent: string | undefined
+): Promise<AnalysisOutput> {
+  const { result: ai, partial } = await analyzeUrl({
+    url: initialSite.url,
+    domain,
+    dom_content: domContent,
+  })
+
+  let company: CompanyRow | null = null
+  let audit: CompanyAuditRow | null = null
+
+  if (ai.company) {
+    company = await upsertCompany(ai.company)
+    if (company && ai.company_audit) {
+      audit = await upsertCompanyAudit(company.id, ai.company_audit)
+    } else if (company) {
+      audit = await fetchCompanyAudit(company.id)
+    }
+  }
+
+  const now = new Date().toISOString()
+  let site = initialSite
+  const { data: updatedSite } = await supabaseAdmin
+    .from('scanned_sites')
+    .update({
+      company_id: company?.id ?? site.company_id ?? null,
+      last_analyzed_at: now,
+      scan_count: site.scan_count + 1,
+      updated_at: now,
+    })
+    .eq('id', site.id)
+    .select('id, url, domain, url_hash, company_id, last_analyzed_at, scan_count')
+    .single()
+  if (updatedSite) site = updatedSite as ScannedSiteRow
+
+  const { data: verdictRow } = await supabaseAdmin
+    .from('site_verdicts')
+    .insert({
+      site_id: site.id,
+      verdict: ai.verdict,
+      score: ai.score,
+      summary: ai.summary,
+      red_flags: ai.red_flags,
+      data_processing_countries: ai.data_processing_countries,
+      is_current: true,
+    })
+    .select('id, verdict, score, summary, red_flags, data_processing_countries, analyzed_at')
+    .single()
+
+  let privacy: PrivacyAnalysisRow | null = null
+  if (ai.privacy_policy) {
+    const { data: privacyRow } = await supabaseAdmin
+      .from('privacy_policy_analyses')
+      .insert({
+        site_id: site.id,
+        short_summary: ai.privacy_policy.short_summary,
+        data_collected: ai.privacy_policy.data_collected,
+        key_clauses: ai.privacy_policy.key_clauses,
+        sells_data_to_third_parties: ai.privacy_policy.sells_data_to_third_parties ?? null,
+        transfers_outside_eea: ai.privacy_policy.transfers_outside_eea ?? null,
+        allows_account_deletion: ai.privacy_policy.allows_account_deletion ?? null,
+        raw_policy_url: ai.privacy_policy.raw_policy_url ?? null,
+        raw_policy_excerpt: ai.privacy_policy.raw_policy_excerpt ?? null,
+        language: ai.privacy_policy.language ?? null,
+        is_current: true,
+      })
+      .select(
+        'short_summary, data_collected, key_clauses, sells_data_to_third_parties, transfers_outside_eea, allows_account_deletion, raw_policy_url, raw_policy_excerpt, language'
+      )
+      .single()
+    privacy = (privacyRow as PrivacyAnalysisRow) ?? null
+  }
+
+  return {
+    site,
+    verdict: (verdictRow as VerdictRow | null) ?? null,
+    privacy,
+    company,
+    audit,
+    partial,
+    analyzedAt: now,
+  }
+}
+
+// ---------------------------------------------------------------------
+// Debounce: nie kickujemy drugiego background-refresh dla tego samego
+// site jeśli pierwszy jeszcze leci. Set per-process — wystarczy dla
+// pojedynczej instancji; przy multi-node konieczna byłaby kolejka/lock.
+// ---------------------------------------------------------------------
+const refreshingSites = new Set<string>()
+
+function scheduleBackgroundRefresh(
+  site: ScannedSiteRow,
+  domain: string,
+  domContent: string | undefined,
+  fastify: FastifyInstance
+): void {
+  if (refreshingSites.has(site.id)) return
+  refreshingSites.add(site.id)
+
+  // Świadomie nie awaitujemy — refresh leci w tle, response już poszedł.
+  void runFullAnalysis(site, domain, domContent)
+    .then((out) => {
+      // Leak detection również w tle — nowy werdykt może wykryć stare wycieki.
+      maybeDetectLeaks(out.verdict, out.site.id, fastify)
+    })
+    .catch((err) => {
+      fastify.log.error({ err, site_id: site.id }, 'background refresh failed')
+    })
+    .finally(() => {
+      refreshingSites.delete(site.id)
+    })
+}
+
+// ---------------------------------------------------------------------
+// maybeAlertChild
+// ---------------------------------------------------------------------
+// Fire-and-forget: jeśli werdykt jest zły (phishing / suspicious / niski
+// score), wpisz alert do parental_alerts dla każdej grupy w której
+// użytkownik jest dzieckiem. Błędy logujemy, response do użytkownika
+// nie czeka.
+// ---------------------------------------------------------------------
+function maybeAlertChild(
+  verdict: VerdictRow | null,
+  siteId: string | null,
+  siteUrl: string,
+  userId: string,
+  fastify: FastifyInstance
+): void {
+  if (!verdict) return
+  const eventType = classifyVerdictForAlert(verdict.verdict, verdict.score)
+  if (!eventType) return
+
+  void recordParentalAlerts(
+    {
+      userId,
+      siteId,
+      siteUrl,
+      eventType,
+      details: { verdict: verdict.verdict, score: verdict.score },
+    },
+    fastify.log
+  )
+}
+
+// ---------------------------------------------------------------------
+// maybeDetectLeaks
+// ---------------------------------------------------------------------
+// Fire-and-forget: jeśli świeży werdykt to phishing/suspicious, walk back
+// po submitted_data_log dla tej strony i utwórz leak_alerts dla każdego
+// użytkownika który wcześniej tam coś wpisał. Idempotentne — dedup po
+// submitted_data_log_id w detectLeaksForSite.
+// ---------------------------------------------------------------------
+function maybeDetectLeaks(
+  verdict: VerdictRow | null,
+  siteId: string,
+  fastify: FastifyInstance
+): void {
+  if (!verdict) return
+  if (verdict.verdict !== 'phishing' && verdict.verdict !== 'suspicious') return
+
+  void detectLeaksForSite({ siteId, verdict: verdict.verdict }, fastify.log)
 }
 
 // ---------------------------------------------------------------------
@@ -320,6 +506,9 @@ export default async function scanRoutes(fastify: FastifyInstance) {
       return reply.code(500).send({ error: 'Failed to register site' })
     }
 
+    // -----------------------------------------------------------------
+    // 1a. Fresh cache hit — zwracamy bez wołania AI
+    // -----------------------------------------------------------------
     if (isFresh(site.last_analyzed_at)) {
       const [verdict, privacy, company] = await Promise.all([
         fetchCurrentVerdict(site.id),
@@ -328,19 +517,18 @@ export default async function scanRoutes(fastify: FastifyInstance) {
       ])
       const audit = await fetchCompanyAudit(site.company_id)
 
-      // Log do historii skanów (cached scan, triggered_refresh=false)
       await supabaseAdmin.from('scan_history').insert({
         user_id: userId,
         site_id: site.id,
         verdict_id: verdict?.id ?? null,
         triggered_refresh: false,
       })
-
-      // Inkrement scan_count (best effort, nie blokujemy responsem)
       await supabaseAdmin
         .from('scanned_sites')
         .update({ scan_count: site.scan_count + 1 })
         .eq('id', site.id)
+
+      maybeAlertChild(verdict, site.id, site.url, userId, fastify)
 
       return assembleResponse({
         url: site.url,
@@ -354,107 +542,74 @@ export default async function scanRoutes(fastify: FastifyInstance) {
     }
 
     // -----------------------------------------------------------------
-    // 2. Pełna analiza przez serwis AI (z timeoutem + fallbackiem)
+    // 1b. Stale-while-revalidate — gdy klient prosi o `prefer_stale`
+    //     i mamy poprzedni werdykt: zwracamy stare dane natychmiast,
+    //     refresh leci w tle (debounced per site).
+    // -----------------------------------------------------------------
+    if (result.data.prefer_stale && site.last_analyzed_at !== null) {
+      const [verdict, privacy, company] = await Promise.all([
+        fetchCurrentVerdict(site.id),
+        fetchCurrentPrivacyAnalysis(site.id),
+        fetchCompany(site.company_id),
+      ])
+      const audit = await fetchCompanyAudit(site.company_id)
+
+      if (verdict) {
+        // Inkrement scan_count i log historii — to wciąż jest "skan" użytkownika
+        await supabaseAdmin
+          .from('scanned_sites')
+          .update({ scan_count: site.scan_count + 1 })
+          .eq('id', site.id)
+        await supabaseAdmin.from('scan_history').insert({
+          user_id: userId,
+          site_id: site.id,
+          verdict_id: verdict.id,
+          triggered_refresh: true,
+        })
+
+        scheduleBackgroundRefresh(site, normalized.domain, result.data.dom_content, fastify)
+        maybeAlertChild(verdict, site.id, site.url, userId, fastify)
+
+        return assembleResponse({
+          url: site.url,
+          verdict,
+          privacy,
+          company,
+          audit,
+          lastAnalyzedAt: site.last_analyzed_at,
+          cached: true,
+          stale: true,
+        })
+      }
+      // brak poprzedniego werdyktu mimo last_analyzed_at — fall through do sync
+    }
+
+    // -----------------------------------------------------------------
+    // 2. Synchronicznie pełna analiza (AI + persist) — domyślna ścieżka
+    //    dla strony nieanalizowanej lub gdy klient nie chce stale.
     // -----------------------------------------------------------------
     const triggeredRefresh = site.last_analyzed_at !== null
-    const { result: ai, partial } = await analyzeUrl({
-      url: normalized.url,
-      domain: normalized.domain,
-      dom_content: result.data.dom_content,
-    })
+    const out = await runFullAnalysis(site, normalized.domain, result.data.dom_content)
 
-    // -----------------------------------------------------------------
-    // 3. Persist: company + audit → site → verdict + privacy
-    // -----------------------------------------------------------------
-    let company: CompanyRow | null = null
-    let audit: CompanyAuditRow | null = null
-
-    if (ai.company) {
-      company = await upsertCompany(ai.company)
-      if (company && ai.company_audit) {
-        audit = await upsertCompanyAudit(company.id, ai.company_audit)
-      } else if (company) {
-        audit = await fetchCompanyAudit(company.id)
-      }
-    }
-
-    const now = new Date().toISOString()
-    const { data: updatedSite } = await supabaseAdmin
-      .from('scanned_sites')
-      .update({
-        company_id: company?.id ?? site.company_id ?? null,
-        last_analyzed_at: now,
-        scan_count: site.scan_count + 1,
-        updated_at: now,
-      })
-      .eq('id', site.id)
-      .select('id, url, domain, url_hash, company_id, last_analyzed_at, scan_count')
-      .single()
-
-    if (updatedSite) site = updatedSite as ScannedSiteRow
-
-    // Werdykt — trigger DB sam ustawi poprzednie is_current=false
-    const { data: verdictRow } = await supabaseAdmin
-      .from('site_verdicts')
-      .insert({
-        site_id: site.id,
-        verdict: ai.verdict,
-        score: ai.score,
-        summary: ai.summary,
-        red_flags: ai.red_flags,
-        data_processing_countries: ai.data_processing_countries,
-        is_current: true,
-      })
-      .select('id, verdict, score, summary, red_flags, data_processing_countries, analyzed_at')
-      .single()
-
-    let privacy: PrivacyAnalysisRow | null = null
-    if (ai.privacy_policy) {
-      const { data: privacyRow } = await supabaseAdmin
-        .from('privacy_policy_analyses')
-        .insert({
-          site_id: site.id,
-          short_summary: ai.privacy_policy.short_summary,
-          data_collected: ai.privacy_policy.data_collected,
-          key_clauses: ai.privacy_policy.key_clauses,
-          sells_data_to_third_parties:
-            ai.privacy_policy.sells_data_to_third_parties ?? null,
-          transfers_outside_eea: ai.privacy_policy.transfers_outside_eea ?? null,
-          allows_account_deletion: ai.privacy_policy.allows_account_deletion ?? null,
-          raw_policy_url: ai.privacy_policy.raw_policy_url ?? null,
-          raw_policy_excerpt: ai.privacy_policy.raw_policy_excerpt ?? null,
-          language: ai.privacy_policy.language ?? null,
-          is_current: true,
-        })
-        .select(
-          'short_summary, data_collected, key_clauses, sells_data_to_third_parties, transfers_outside_eea, allows_account_deletion, raw_policy_url, raw_policy_excerpt, language'
-        )
-        .single()
-      privacy = (privacyRow as PrivacyAnalysisRow) ?? null
-    }
-
-    // -----------------------------------------------------------------
-    // 4. Historia skanów per user
-    // -----------------------------------------------------------------
     await supabaseAdmin.from('scan_history').insert({
       user_id: userId,
-      site_id: site.id,
-      verdict_id: (verdictRow as VerdictRow | null)?.id ?? null,
+      site_id: out.site.id,
+      verdict_id: out.verdict?.id ?? null,
       triggered_refresh: triggeredRefresh,
     })
 
-    // -----------------------------------------------------------------
-    // 5. Response
-    // -----------------------------------------------------------------
+    maybeAlertChild(out.verdict, out.site.id, out.site.url, userId, fastify)
+    maybeDetectLeaks(out.verdict, out.site.id, fastify)
+
     return assembleResponse({
-      url: site.url,
-      verdict: (verdictRow as VerdictRow | null) ?? null,
-      privacy,
-      company,
-      audit,
-      lastAnalyzedAt: now,
+      url: out.site.url,
+      verdict: out.verdict,
+      privacy: out.privacy,
+      company: out.company,
+      audit: out.audit,
+      lastAnalyzedAt: out.analyzedAt,
       cached: false,
-      partial,
+      partial: out.partial,
     })
   })
 }

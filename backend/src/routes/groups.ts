@@ -13,6 +13,9 @@ import {
   groupAndInvitationParamsSchema,
   tokenParamsSchema,
   scanHistoryQuerySchema,
+  parentalAlertsQuerySchema,
+  groupAndAlertParamsSchema,
+  safetyStatsQuerySchema,
   GroupRole,
 } from '../schemas/groups'
 
@@ -644,6 +647,192 @@ export default async function groupRoutes(fastify: FastifyInstance) {
 
       if (error) return reply.code(500).send({ error: 'Failed to fetch alerts' })
       return { alerts: data ?? [] }
+    }
+  )
+
+  // -------------------------------------------------------------------
+  // GET /api/groups/:id/parental-alerts
+  // Lista wszystkich alertów w grupie (po wszystkich dzieciach).
+  // Admin only. Filtry: acknowledged, event_type, child_user_id.
+  // -------------------------------------------------------------------
+  fastify.get(
+    '/groups/:id/parental-alerts',
+    { preHandler: [authenticate] },
+    async (request, reply) => {
+      const params = groupIdParamsSchema.safeParse(request.params)
+      if (!params.success) return reply.code(400).send({ error: 'Invalid group id' })
+
+      const query = parentalAlertsQuerySchema.safeParse(request.query)
+      if (!query.success) {
+        return reply.code(400).send({ error: 'Invalid query', details: query.error.flatten() })
+      }
+
+      const callerMembership = await getMembership(params.data.id, request.user!.id)
+      if (!callerMembership) return reply.code(404).send({ error: 'Group not found' })
+      if (callerMembership.role !== 'admin') return reply.code(403).send({ error: 'Admin only' })
+
+      let q = supabaseAdmin
+        .from('parental_alerts')
+        .select(
+          'id, child_user_id, site_id, site_url, event_type, details, occurred_at, acknowledged_at, child:user_profiles!parental_alerts_child_user_id_fkey(display_name, avatar_url)',
+          { count: 'exact' }
+        )
+        .eq('group_id', params.data.id)
+
+      if (query.data.acknowledged === true) q = q.not('acknowledged_at', 'is', null)
+      else if (query.data.acknowledged === false) q = q.is('acknowledged_at', null)
+      if (query.data.event_type) q = q.eq('event_type', query.data.event_type)
+      if (query.data.child_user_id) q = q.eq('child_user_id', query.data.child_user_id)
+
+      const { data, error, count } = await q
+        .order('occurred_at', { ascending: false })
+        .range(query.data.offset, query.data.offset + query.data.limit - 1)
+
+      if (error) return reply.code(500).send({ error: 'Failed to fetch alerts' })
+      return {
+        alerts: data ?? [],
+        total: count ?? 0,
+        limit: query.data.limit,
+        offset: query.data.offset,
+      }
+    }
+  )
+
+  // -------------------------------------------------------------------
+  // POST /api/groups/:id/parental-alerts/:alertId/acknowledge
+  // Oznacza alert jako przejrzany. Admin only.
+  // -------------------------------------------------------------------
+  fastify.post(
+    '/groups/:id/parental-alerts/:alertId/acknowledge',
+    { preHandler: [authenticate] },
+    async (request, reply) => {
+      const params = groupAndAlertParamsSchema.safeParse(request.params)
+      if (!params.success) return reply.code(400).send({ error: 'Invalid params' })
+
+      const callerMembership = await getMembership(params.data.id, request.user!.id)
+      if (!callerMembership) return reply.code(404).send({ error: 'Group not found' })
+      if (callerMembership.role !== 'admin') return reply.code(403).send({ error: 'Admin only' })
+
+      const { data, error } = await supabaseAdmin
+        .from('parental_alerts')
+        .update({ acknowledged_at: new Date().toISOString() })
+        .eq('id', params.data.alertId)
+        .eq('group_id', params.data.id)
+        .is('acknowledged_at', null)
+        .select('id, acknowledged_at')
+        .maybeSingle()
+
+      if (error) return reply.code(500).send({ error: 'Failed to acknowledge alert' })
+      if (!data) return reply.code(404).send({ error: 'Alert not found or already acknowledged' })
+      return data
+    }
+  )
+
+  // -------------------------------------------------------------------
+  // GET /api/groups/:id/members/:userId/safety-stats
+  // Statystyki bezpieczeństwa członka — total scans, blocked, suspicious,
+  // open alerts, top zagrożenia z ostatnich N dni. Admin only.
+  // -------------------------------------------------------------------
+  fastify.get(
+    '/groups/:id/members/:userId/safety-stats',
+    { preHandler: [authenticate] },
+    async (request, reply) => {
+      const params = groupAndUserParamsSchema.safeParse(request.params)
+      if (!params.success) return reply.code(400).send({ error: 'Invalid params' })
+
+      const query = safetyStatsQuerySchema.safeParse(request.query)
+      if (!query.success) return reply.code(400).send({ error: 'Invalid query' })
+
+      const callerMembership = await getMembership(params.data.id, request.user!.id)
+      if (!callerMembership) return reply.code(404).send({ error: 'Group not found' })
+      if (callerMembership.role !== 'admin') return reply.code(403).send({ error: 'Admin only' })
+
+      const target = await getMembership(params.data.id, params.data.userId)
+      if (!target) return reply.code(404).send({ error: 'Member not found in this group' })
+
+      const sinceIso = new Date(
+        Date.now() - query.data.days * 24 * 60 * 60 * 1000
+      ).toISOString()
+
+      // Wszystko leci równolegle — to są niezależne agregacje.
+      const [
+        totalScansRes,
+        recentScansRes,
+        openAlertsRes,
+        blockedAlertsRes,
+        suspiciousAlertsRes,
+        recentScansByVerdict,
+      ] = await Promise.all([
+        supabaseAdmin
+          .from('scan_history')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', params.data.userId),
+        supabaseAdmin
+          .from('scan_history')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', params.data.userId)
+          .gte('scanned_at', sinceIso),
+        supabaseAdmin
+          .from('parental_alerts')
+          .select('id', { count: 'exact', head: true })
+          .eq('group_id', params.data.id)
+          .eq('child_user_id', params.data.userId)
+          .is('acknowledged_at', null),
+        supabaseAdmin
+          .from('parental_alerts')
+          .select('id', { count: 'exact', head: true })
+          .eq('group_id', params.data.id)
+          .eq('child_user_id', params.data.userId)
+          .eq('event_type', 'visit_blocked')
+          .gte('occurred_at', sinceIso),
+        supabaseAdmin
+          .from('parental_alerts')
+          .select('id', { count: 'exact', head: true })
+          .eq('group_id', params.data.id)
+          .eq('child_user_id', params.data.userId)
+          .eq('event_type', 'suspicious_site_visited')
+          .gte('occurred_at', sinceIso),
+        supabaseAdmin
+          .from('scan_history')
+          .select('verdict:site_verdicts(verdict), site:scanned_sites(domain)')
+          .eq('user_id', params.data.userId)
+          .gte('scanned_at', sinceIso)
+          .limit(500),
+      ])
+
+      // Oblicz top domains z bad verdicts.
+      // Supabase typuje zagnieżdżone joiny jako tablice (nie wie że FK jest 1:1),
+      // więc rzutujemy przez unknown na shape z optional array/object.
+      type ScanRow = {
+        verdict?: { verdict: string } | { verdict: string }[] | null
+        site?: { domain: string } | { domain: string }[] | null
+      }
+      const pickFirst = <T>(v: T | T[] | null | undefined): T | null =>
+        Array.isArray(v) ? v[0] ?? null : v ?? null
+
+      const domainCounts = new Map<string, number>()
+      for (const row of (recentScansByVerdict.data ?? []) as unknown as ScanRow[]) {
+        const v = pickFirst(row.verdict)?.verdict
+        const d = pickFirst(row.site)?.domain
+        if (!d || !v) continue
+        if (v === 'phishing' || v === 'suspicious') {
+          domainCounts.set(d, (domainCounts.get(d) ?? 0) + 1)
+        }
+      }
+      const topRiskyDomains = [...domainCounts.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([domain, count]) => ({ domain, count }))
+
+      return {
+        window_days: query.data.days,
+        total_scans: totalScansRes.count ?? 0,
+        scans_in_window: recentScansRes.count ?? 0,
+        open_alerts: openAlertsRes.count ?? 0,
+        blocked_in_window: blockedAlertsRes.count ?? 0,
+        suspicious_in_window: suspiciousAlertsRes.count ?? 0,
+        top_risky_domains: topRiskyDomains,
+      }
     }
   )
 }
