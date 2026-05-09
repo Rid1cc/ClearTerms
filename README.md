@@ -1,11 +1,100 @@
-# Kosciuszkon
+# CLEARTERMS
 
- Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi tincidunt tincidunt sem ut rutrum. Nam nisl dui, rutrum nec dignissim hendrerit, faucibus ac tortor. Sed non velit at dui rutrum tincidunt. Etiam vitae sem porttitor enim vestibulum elementum eu ac lorem. Fusce accumsan condimentum massa, vitae tristique dolor elementum eu. Quisque aliquet nulla eu sapien pellentesque, ut porttitor elit eleifend. Integer lacinia ipsum vitae dolor suscipit finibus. Integer ut eros rutrum metus eleifend aliquam. Maecenas quam elit, rhoncus sed ligula vel, feugiat consectetur dui. Morbi ultricies, justo a molestie pharetra, nisi nunc varius massa, eu fermentum justo odio vitae risus. Mauris dapibus odio ullamcorper lacinia hendrerit. Aenean justo quam, pretium eu turpis non, tristique tempor lectus. Ut ultrices porta metus, ac tincidunt sapien feugiat quis. Suspendisse eu eros erat. Nulla ac quam ac magna consectetur scelerisque id nec tellus.
+> AI-powered cybersecurity awareness platform that translates privacy risks into human language.
 
-Phasellus vulputate quam at efficitur porttitor. Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Cras vitae ante urna. Integer non neque quis lorem dapibus venenatis ac non purus. Pellentesque egestas est id nibh consequat faucibus. Vivamus fermentum laoreet sollicitudin. Duis aliquam tortor justo, ut venenatis nibh pulvinar sed. Maecenas congue dictum dolor. Curabitur tellus diam, rutrum ac magna vel, mattis consequat libero. Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Etiam auctor vel sem vitae hendrerit. Pellentesque convallis consequat consectetur. In vitae urna ut eros dignissim dictum sit amet vel tellus. In volutpat blandit sapien, sed aliquet augue malesuada eget. Fusce sit amet ex eget velit egestas malesuada sit amet feugiat lectus.
+---
 
-Cras dapibus sed nibh et tincidunt. Aenean ullamcorper odio felis, ac tincidunt odio ultrices sit amet. Donec placerat convallis rutrum. Vestibulum volutpat lacinia erat, id pretium metus fringilla at. In convallis nibh nec tortor varius fermentum. Ut nulla tellus, commodo sed urna sed, mollis congue nulla. Pellentesque sit amet accumsan leo. Maecenas commodo turpis sit amet consectetur iaculis. Pellentesque et erat aliquet, cursus mauris vitae, facilisis magna. Nulla in neque mi. Nulla lectus lorem, congue eu elit nec, consectetur scelerisque massa. Proin ullamcorper leo enim, nec interdum tellus tempus eget. Aliquam tristique ipsum lorem, non rutrum nunc commodo eget. Fusce vitae augue euismod, cursus risus tincidunt, tincidunt dui. Etiam fringilla mauris tristique ligula varius accumsan.
+## 🧠 What is ClearTerms?
 
-Praesent blandit faucibus consectetur. Pellentesque vel purus nisi. Mauris non laoreet turpis, et semper nibh. Proin ex mauris, eleifend eget maximus ac, vestibulum commodo enim. Vestibulum nec imperdiet arcu, ac aliquam enim. Duis aliquet ex sed felis tristique blandit in ut neque. Sed at sem dignissim, condimentum dui ut, egestas risus. Duis eget nunc interdum, lobortis lorem vel, ullamcorper nunc. Pellentesque pellentesque imperdiet consequat.
+ClearTerms is an AI-powered browser extension and web platform focused on cybersecurity awareness and digital transparency.
 
-Etiam semper risus eget turpis semper sodales. Duis tellus diam, pretium at fringilla non, auctor vel magna. Proin luctus est commodo sapien maximus, nec faucibus augue blandit. Vivamus ultrices venenatis dolor, eget aliquam diam euismod vel. Suspendisse in risus at odio gravida dictum ut nec dolor. Aliquam a molestie sapien, non scelerisque dolor. Mauris elit velit, maximus ac eros ut, bibendum scelerisque lectus. Donec a ipsum ornare odio vehicula cursus vel sed justo. 
+We help everyday internet users understand:
+- what websites collect,
+- where their data goes,
+- what risks exist,
+- and whether a platform can actually be trusted.
+
+Instead of overwhelming users with technical warnings, ClearTerms explains cybersecurity threats in a simple and beginner-friendly way.
+
+---
+
+# 🚨 The Problem
+
+Every day, millions of users:
+- accept Terms of Service without reading them,
+- share personal data unknowingly,
+- fall for phishing and scams,
+- trust platforms they do not understand.
+
+Modern privacy policies are intentionally:
+- long,
+- complex,
+- legal-heavy,
+- inaccessible for average users.
+
+Existing cybersecurity tools mainly focus on blocking threats — not educating users.
+
+---
+
+# 💡 Our Solution
+
+ClearTerms transforms complicated cybersecurity and privacy information into:
+- simple AI summaries,
+- trust scores,
+- educational explanations,
+- actionable recommendations.
+
+Our browser extension analyzes websites in real-time and warns users before they make risky decisions online.
+
+---
+
+# ⚡ Key Features
+
+## 🔍 Real-Time Website Analysis
+AI analyzes:
+- Privacy Policies
+- EULAs
+- Terms of Service
+- Website reputation
+- Known data breaches
+- Tracking behavior
+
+---
+
+## 🛡 AI Trust Score
+Every website receives:
+- Privacy Score
+- Transparency Rating
+- Risk Level
+- Consumer Safety Recommendation
+
+---
+
+## 📚 Educational Cybersecurity Platform
+ClearTerms teaches users:
+- how scams work,
+- how tracking works,
+- what phishing looks like,
+- how companies use their data.
+
+---
+
+## 🌎 Global Website Database
+Users can search:
+- analyzed websites,
+- company trust scores,
+- known risks,
+- data-sharing practices.
+
+---
+
+## 🧩 Browser Extension
+The extension displays instant alerts directly inside the browser:
+
+```txt
+⚠ High Tracking Activity Detected
+⚠ Third-Party Data Sharing
+⚠ Previous Data Breach Associated
+
+Recommendation:
+Proceed with caution.
