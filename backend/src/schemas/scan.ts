@@ -8,4 +8,11 @@ export const scanRequestSchema = z.object({
   dom_content: z.string().max(500_000).optional(),
 })
 
+export const extensionScanResultSchema = z.object({
+  sourcePage: z.string().min(1).max(2048),
+  privacyUrl: z.string().min(1).max(2048),
+  analysis: z.string().min(1).max(50_000),
+})
+
 export type ScanRequest = z.infer<typeof scanRequestSchema>
+export type ExtensionScanResult = z.infer<typeof extensionScanResultSchema>
