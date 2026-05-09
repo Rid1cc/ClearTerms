@@ -3,7 +3,7 @@ import { authenticate } from '../plugins/authenticate'
 import { supabaseAdmin } from '../config/supabase'
 import { config } from '../config/env'
 import { normalizeUrl } from '../utils/url'
-import { scanRequestSchema } from '../schemas/scan'
+import { extensionScanResultSchema, scanRequestSchema } from '../schemas/scan'
 import { analyzeUrl, AiAnalysisResult } from '../services/aiService'
 import { backfillLeakAlertsForSite } from '../services/submittedDataLeak'
 
@@ -292,10 +292,119 @@ function assembleResponse(args: {
   }
 }
 
+function parseExtensionAnalysis(analysis: string): {
+  score: number
+  verdict: 'safe' | 'suspicious' | 'phishing' | 'unknown'
+  summary: string
+} {
+  const scoreMatch = analysis.match(/Score:\s*(\d{1,3})\s*\/\s*100/i)
+  const parsedScore = scoreMatch ? Number(scoreMatch[1]) : 50
+  const score = Math.max(0, Math.min(100, Number.isFinite(parsedScore) ? parsedScore : 50))
+  const explanationMatch = analysis.match(/Explanation:\s*([\s\S]*)/i)
+  const summary = explanationMatch?.[1]?.trim() || analysis.trim()
+
+  let verdict: 'safe' | 'suspicious' | 'phishing' | 'unknown' = 'unknown'
+  if (score >= 70) verdict = 'safe'
+  else if (score >= 30) verdict = 'suspicious'
+  else verdict = 'phishing'
+
+  return { score, verdict, summary }
+}
+
 // ---------------------------------------------------------------------
 // Route
 // ---------------------------------------------------------------------
 export default async function scanRoutes(fastify: FastifyInstance) {
+  fastify.post('/scan/extension-result', { preHandler: [authenticate] }, async (request, reply) => {
+    const result = extensionScanResultSchema.safeParse(request.body)
+    if (!result.success) {
+      return reply.code(400).send({ error: 'Validation error', details: result.error.flatten() })
+    }
+
+    let normalized
+    try {
+      normalized = normalizeUrl(result.data.sourcePage)
+    } catch {
+      return reply.code(400).send({ error: 'Invalid URL' })
+    }
+
+    const userId = request.user!.id
+    let site = await getOrCreateSite(normalized.url, normalized.domain, normalized.hash)
+    if (!site) {
+      return reply.code(500).send({ error: 'Failed to register site' })
+    }
+
+    const parsed = parseExtensionAnalysis(result.data.analysis)
+    const now = new Date().toISOString()
+
+    const { data: updatedSite } = await supabaseAdmin
+      .from('scanned_sites')
+      .update({
+        last_analyzed_at: now,
+        scan_count: site.scan_count + 1,
+        updated_at: now,
+      })
+      .eq('id', site.id)
+      .select('id, url, domain, url_hash, company_id, last_analyzed_at, scan_count')
+      .single()
+
+    if (updatedSite) site = updatedSite as ScannedSiteRow
+
+    const { data: verdictRow } = await supabaseAdmin
+      .from('site_verdicts')
+      .insert({
+        site_id: site.id,
+        verdict: parsed.verdict,
+        score: parsed.score,
+        summary: parsed.summary,
+        red_flags: [],
+        data_processing_countries: [],
+        is_current: true,
+      })
+      .select('id, verdict, score, summary, red_flags, data_processing_countries, analyzed_at')
+      .single()
+
+    const { data: privacyRow } = await supabaseAdmin
+      .from('privacy_policy_analyses')
+      .insert({
+        site_id: site.id,
+        short_summary: parsed.summary,
+        data_collected: [],
+        key_clauses: [],
+        sells_data_to_third_parties: null,
+        transfers_outside_eea: null,
+        allows_account_deletion: null,
+        raw_policy_url: result.data.privacyUrl,
+        raw_policy_excerpt: result.data.analysis.slice(0, 2000),
+        language: null,
+        is_current: true,
+      })
+      .select(
+        'short_summary, data_collected, key_clauses, sells_data_to_third_parties, transfers_outside_eea, allows_account_deletion, raw_policy_url, raw_policy_excerpt, language'
+      )
+      .single()
+
+    await supabaseAdmin.from('scan_history').insert({
+      user_id: userId,
+      site_id: site.id,
+      verdict_id: (verdictRow as VerdictRow | null)?.id ?? null,
+      triggered_refresh: true,
+    })
+
+    const company = await fetchCompany(site.company_id)
+    const audit = await fetchCompanyAudit(site.company_id)
+
+    return assembleResponse({
+      url: site.url,
+      verdict: (verdictRow as VerdictRow | null) ?? null,
+      privacy: (privacyRow as PrivacyAnalysisRow | null) ?? null,
+      company,
+      audit,
+      lastAnalyzedAt: now,
+      cached: false,
+    })
+  })
+
   // POST /api/scan
   // Pełna analiza strony (cache 24h → AI → DB → response).
   fastify.post('/scan', { preHandler: [authenticate] }, async (request, reply) => {
