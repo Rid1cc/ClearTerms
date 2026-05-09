@@ -4,8 +4,8 @@ export default function Topbar({ ctaLabel = "Sign in", ctaHref = "/login" }) {
   return (
     <nav className="topbar glass reveal">
       <div className="brand">
-        <span className="brand__icon">CT</span>
-        <span className="brand__name">ClearTerms</span>
+        <span className="brand__icon"><Link className="" href="/">CT</Link></span>
+        <span className="brand__name"><Link className="" href="/">ClearTerms</Link></span>
       </div>
       <div className="topbar__links">
         <Link className="ghost" href="/dashboard">Dashboard</Link>
