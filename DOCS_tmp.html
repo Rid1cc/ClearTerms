@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>DOCS.md</title>
+<meta http-equiv="Content-type" content="text/html;charset=UTF-8">
+
+<style>
+/* https://github.com/microsoft/vscode/blob/master/extensions/markdown-language-features/media/markdown.css */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+body {
+	font-family: var(--vscode-markdown-font-family, -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif);
+	font-size: var(--vscode-markdown-font-size, 14px);
+	padding: 0 26px;
+	line-height: var(--vscode-markdown-line-height, 22px);
+	word-wrap: break-word;
+}
+
+#code-csp-warning {
+	position: fixed;
+	top: 0;
+	right: 0;
+	color: white;
+	margin: 16px;
+	text-align: center;
+	font-size: 12px;
+	font-family: sans-serif;
+	background-color:#444444;
+	cursor: pointer;
+	padding: 6px;
+	box-shadow: 1px 1px 1px rgba(0,0,0,.25);
+}
+
+#code-csp-warning:hover {
+	text-decoration: none;
+	background-color:#007acc;
+	box-shadow: 2px 2px 2px rgba(0,0,0,.25);
+}
+
+body.scrollBeyondLastLine {
+	margin-bottom: calc(100vh - 22px);
+}
+
+body.showEditorSelection .code-line {
+	position: relative;
+}
+
+body.showEditorSelection .code-active-line:before,
+body.showEditorSelection .code-line:hover:before {
+	content: "";
+	display: block;
+	position: absolute;
+	top: 0;
+	left: -12px;
+	height: 100%;
+}
+
+body.showEditorSelection li.code-active-line:before,
+body.showEditorSelection li.code-line:hover:before {
+	left: -30px;
+}
+
+.vscode-light.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(0, 0, 0, 0.15);
+}
+
+.vscode-light.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(0, 0, 0, 0.40);
+}
+
+.vscode-light.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+.vscode-dark.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(255, 255, 255, 0.4);
+}
+
+.vscode-dark.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(255, 255, 255, 0.60);
+}
+
+.vscode-dark.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+.vscode-high-contrast.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(255, 160, 0, 0.7);
+}
+
+.vscode-high-contrast.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(255, 160, 0, 1);
+}
+
+.vscode-high-contrast.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+img {
+	max-width: 100%;
+	max-height: 100%;
+}
+
+a {
+	text-decoration: none;
+}
+
+a:hover {
+	text-decoration: underline;
+}
+
+a:focus,
+input:focus,
+select:focus,
+textarea:focus {
+	outline: 1px solid -webkit-focus-ring-color;
+	outline-offset: -1px;
+}
+
+hr {
+	border: 0;
+	height: 2px;
+	border-bottom: 2px solid;
+}
+
+h1 {
+	padding-bottom: 0.3em;
+	line-height: 1.2;
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+}
+
+h1, h2, h3 {
+	font-weight: normal;
+}
+
+table {
+	border-collapse: collapse;
+}
+
+table > thead > tr > th {
+	text-align: left;
+	border-bottom: 1px solid;
+}
+
+table > thead > tr > th,
+table > thead > tr > td,
+table > tbody > tr > th,
+table > tbody > tr > td {
+	padding: 5px 10px;
+}
+
+table > tbody > tr + tr > td {
+	border-top: 1px solid;
+}
+
+blockquote {
+	margin: 0 7px 0 5px;
+	padding: 0 16px 0 10px;
+	border-left-width: 5px;
+	border-left-style: solid;
+}
+
+code {
+	font-family: Menlo, Monaco, Consolas, "Droid Sans Mono", "Courier New", monospace, "Droid Sans Fallback";
+	font-size: 1em;
+	line-height: 1.357em;
+}
+
+body.wordWrap pre {
+	white-space: pre-wrap;
+}
+
+pre:not(.hljs),
+pre.hljs code > div {
+	padding: 16px;
+	border-radius: 3px;
+	overflow: auto;
+}
+
+pre code {
+	color: var(--vscode-editor-foreground);
+	tab-size: 4;
+}
+
+/** Theming */
+
+.vscode-light pre {
+	background-color: rgba(220, 220, 220, 0.4);
+}
+
+.vscode-dark pre {
+	background-color: rgba(10, 10, 10, 0.4);
+}
+
+.vscode-high-contrast pre {
+	background-color: rgb(0, 0, 0);
+}
+
+.vscode-high-contrast h1 {
+	border-color: rgb(0, 0, 0);
+}
+
+.vscode-light table > thead > tr > th {
+	border-color: rgba(0, 0, 0, 0.69);
+}
+
+.vscode-dark table > thead > tr > th {
+	border-color: rgba(255, 255, 255, 0.69);
+}
+
+.vscode-light h1,
+.vscode-light hr,
+.vscode-light table > tbody > tr + tr > td {
+	border-color: rgba(0, 0, 0, 0.18);
+}
+
+.vscode-dark h1,
+.vscode-dark hr,
+.vscode-dark table > tbody > tr + tr > td {
+	border-color: rgba(255, 255, 255, 0.18);
+}
+
+</style>
+
+<style>
+/* Tomorrow Theme */
+/* http://jmblog.github.com/color-themes-for-google-code-highlightjs */
+/* Original theme - https://github.com/chriskempson/tomorrow-theme */
+
+/* Tomorrow Comment */
+.hljs-comment,
+.hljs-quote {
+	color: #8e908c;
+}
+
+/* Tomorrow Red */
+.hljs-variable,
+.hljs-template-variable,
+.hljs-tag,
+.hljs-name,
+.hljs-selector-id,
+.hljs-selector-class,
+.hljs-regexp,
+.hljs-deletion {
+	color: #c82829;
+}
+
+/* Tomorrow Orange */
+.hljs-number,
+.hljs-built_in,
+.hljs-builtin-name,
+.hljs-literal,
+.hljs-type,
+.hljs-params,
+.hljs-meta,
+.hljs-link {
+	color: #f5871f;
+}
+
+/* Tomorrow Yellow */
+.hljs-attribute {
+	color: #eab700;
+}
+
+/* Tomorrow Green */
+.hljs-string,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-addition {
+	color: #718c00;
+}
+
+/* Tomorrow Blue */
+.hljs-title,
+.hljs-section {
+	color: #4271ae;
+}
+
+/* Tomorrow Purple */
+.hljs-keyword,
+.hljs-selector-tag {
+	color: #8959a8;
+}
+
+.hljs {
+	display: block;
+	overflow-x: auto;
+	color: #4d4d4c;
+	padding: 0.5em;
+}
+
+.hljs-emphasis {
+	font-style: italic;
+}
+
+.hljs-strong {
+	font-weight: bold;
+}
+</style>
+
+<style>
+/*
+ * Markdown PDF CSS
+ */
+
+ body {
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif, "Meiryo";
+	padding: 0 12px;
+}
+
+pre {
+	background-color: #f8f8f8;
+	border: 1px solid #cccccc;
+	border-radius: 3px;
+	overflow-x: auto;
+	white-space: pre-wrap;
+	overflow-wrap: break-word;
+}
+
+pre:not(.hljs) {
+	padding: 23px;
+	line-height: 19px;
+}
+
+blockquote {
+	background: rgba(127, 127, 127, 0.1);
+	border-color: rgba(0, 122, 204, 0.5);
+}
+
+.emoji {
+	height: 1.4em;
+}
+
+code {
+	font-size: 14px;
+	line-height: 19px;
+}
+
+/* for inline code */
+:not(pre):not(.hljs) > code {
+	color: #C9AE75; /* Change the old color so it seems less like an error */
+	font-size: inherit;
+}
+
+/* Page Break : use <div class="page"/> or <div class="page"></div> to insert page break
+-------------------------------------------------------- */
+.page {
+	page-break-after: always;
+}
+
+</style>
+
+<script src="https://unpkg.com/mermaid/dist/mermaid.min.js"></script>
+</head>
+<body>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: document.body.classList.contains('vscode-dark') || document.body.classList.contains('vscode-high-contrast')
+          ? 'dark'
+          : 'default'
+    });
+  </script>
+<h1 id="clearterms--rozszerzona-dokumentacja-techniczna">ClearTerms - Rozszerzona Dokumentacja Techniczna</h1>
+<blockquote>
+<p>Platforma uświadamiająca o zagrożeniach prywatności, która tłumaczy techniczny i prawny żargon na ludzki język przy użyciu AI.</p>
+<p><strong>Faza Projektu:</strong> Hackathon Prototype / MVP
+<strong>Core Stack:</strong> Fastify + Supabase (Postgres) · Next.js 16 (React 19) · Chromium MV3 Extension</p>
+</blockquote>
+<hr>
+<h2 id="1-executive-summary-podsumowanie">1. Executive Summary (Podsumowanie)</h2>
+<p>ClearTerms to innowacyjne rozwiązanie mające na celu zasypanie przepaści między skomplikowanymi zagrożeniami prywatności a przeciętnym użytkownikiem internetu. Wykorzystując przeglądarkowe rozszerzenie działające w czasie rzeczywistym oraz zintegrowane mechanizmy Sztucznej Inteligencji (LLM) wspierane przez deterministyczne silniki heurystyczne, aplikacja automatycznie analizuje odwiedzane witryny, ich polityki prywatności oraz zasady przetwarzania danych.</p>
+<p>Niniejsza dokumentacja jest przeznaczona dla sędziów hackathonu, programistów oraz inżynierów testujących projekt. Znajdziesz w niej kompletną architekturę, nasze decyzje inżynieryjne skoncentrowane na bezpieczeństwie (Privacy by Design), model bazodanowy oraz szczegółowe procedury wdrożeniowe.</p>
+<hr>
+<h2 id="2-architektura-systemu">2. Architektura Systemu</h2>
+<p>System opiera się na rozproszonej, modularnej architekturze z trzema niezależnymi komponentami, które wspólnie korzystają ze scentralizowanej bazy PostgreSQL.</p>
+<pre class="hljs"><code><div>┌─────────────────────┐     POST /api/scan         ┌────────────────────┐
+│   Browser Extension │ ─────────────────────────► │   Fastify Backend  │
+│   (Manifest V3)     │ ◄───────────────────────── │   (Node 20 + TS)   │
+└─────────────────────┘     verdict + score        └─────────┬──────────┘
+         │                                                   │ auth &amp; data
+         ▼ blocks/warns UX                                   ▼
+┌─────────────────────┐     fetch /api/dashboard   ┌────────────────────┐
+│   Web Dashboard     │ ─────────────────────────► │  Supabase DB       │
+│   (Next.js 16 RSC)  │ ◄───────────────────────── │  (Postgres + RLS)  │
+└─────────────────────┘     dashboard JSON         └────────────────────┘
+</div></code></pre>
+<h3 id="21-przykładowy-przepływ-analiza-strony-www">2.1. Przykładowy Przepływ: Analiza Strony WWW</h3>
+<ol>
+<li><strong>Trigger (Wyzwalacz)</strong>: Użytkownik wchodzi na podany adres URL. Service Worker extensiona wykrywa to zdarzenie.</li>
+<li><strong>Ekstrakcja (Content Script)</strong>: Skrypt wstrzyknięty w stronę analizuje DOM w poszukiwaniu polityki prywatności oraz metadanych witryny.</li>
+<li><strong>Orkiestracja</strong>: Rozszerzenie przesyła żądanie do endpointu <code>/api/scan</code> na backendzie.</li>
+<li><strong>Weryfikacja Cache</strong>: Backend za pomocą zoptymalizowanego hasha SHA-256 sprawdza, czy domena była skanowana w ciągu ostatnich 24 godzin (<code>SCAN_CACHE_TTL_HOURS</code>).</li>
+<li><strong>Przetwarzanie AI</strong>: Jeśli brak cache, uruchamiana jest integracja AI (lokalne API Proxy lub zew. usługi), generująca wynik (<code>verdict</code>), punktację (<code>score 0-100</code>) i podsumowanie uchybień.</li>
+<li><strong>Zapis i Odpowiedź</strong>: Rezultat jest zapisywany w bazie (omija ograniczenia RLS dzięki <code>service_role</code>), a znormalizowana odpowiedź wraca do rozszerzenia.</li>
+<li><strong>Reakcja UX</strong>: Rozszerzenie aktualizuje swój stan i w zależności od rezultatu wyświetla użytkownikowi ostrzeżenie/blokadę o odpowiednim zabarwieniu (np. <code>suspicious</code>, <code>phishing</code>).</li>
+</ol>
+<hr>
+<h2 id="3-wybór-technologii-tech-stack">3. Wybór Technologii (Tech Stack)</h2>
+<h3 id="31-infrastruktura-i-backend">3.1. Infrastruktura i Backend</h3>
+<ul>
+<li><strong>Fastify (Node.js 20, TypeScript)</strong>: Wybrany ze względu na swoją wydajność, minimalny narzut i świetny system pluginów. Odpowiada za orkiestrację całego ruchu i komunikację z bazą. Wszystkie schematy walidowane są przez bibliotekę <code>zod</code>.</li>
+<li><strong>Supabase (PostgreSQL + Auth)</strong>: Służy jako serce danych. Wykorzystujemy jego mechanizmy JWT do uwierzytelniania, a wbudowane Row Level Security (RLS) gwarantuje izolację danych użytkowników w warstwie bazy.</li>
+</ul>
+<h3 id="32-dashboard-aplikacja-webowa">3.2. Dashboard (Aplikacja Webowa)</h3>
+<ul>
+<li><strong>Next.js 16 (React 19, RSC)</strong>: Nowoczesny framework oparty o React Server Components. Zapewnia optymalną wydajność i mniejszy rozmiar bundla przesyłanego do przeglądarki.</li>
+<li><strong>Tailwind CSS v4 &amp; Recharts</strong>: Pozwalają na bardzo szybki development i budowę zaawansowanych, interaktywnych wykresów w panelu analitycznym.</li>
+</ul>
+<h3 id="33-browser-extension-wtyczka">3.3. Browser Extension (Wtyczka)</h3>
+<ul>
+<li><strong>Manifest V3 (Vanilla JS)</strong>: Gwarantuje zgodność z najnowszymi standardami bezpieczeństwa Chrome Web Store, unikając przy tym ciężaru wielkich frameworków frontendowych w samym rozszerzeniu. Używamy Service Workerów (background.js) do komunikacji oraz Content Skryptów do interakcji z DOM-em odwiedzanej strony.</li>
+</ul>
+<hr>
+<h2 id="4-innowacje-inżynieryjne-wow-factors">4. Innowacje Inżynieryjne (&quot;Wow Factors&quot;)</h2>
+<p>Projekt obfituje w zaawansowane rozwiązania pokazujące głębokie zrozumienie wyzwań cybersecurity i prywatności. Te punkty powinny być silnie podkreślone podczas pitchingu.</p>
+<h3 id="41-deterministyczny-fallback-heurystyczny">4.1. Deterministyczny Fallback Heurystyczny</h3>
+<p>Zewnętrzne usługi AI (np. OpenAI, Gemini) regularnie zmagają się z opóźnieniami (latency) i limitami zapytań.</p>
+<ul>
+<li><strong>Rozwiązanie:</strong> Wdrożyliśmy niestandardowy mechanizm Fallbacku. Jeśli integracja z AI nie odpowie w ciągu dopuszczalnego czasu (np. 30s) lub zwróci błąd, backend przejmuje zapytanie.</li>
+<li><strong>Działanie:</strong> Wykorzystuje heurystykę i wyrażenia regularne, wykrywając podejrzane TLD (np. <code>.ru</code>, <code>.cn</code>, <code>.zip</code>), zbyt dużą liczbę parametrów śledzących w URL oraz surowe adresy IP.</li>
+<li>Zwraca wynik <code>partial: true</code>, pozwalając rozszerzeniu na płynną zmianę stanu bez zawieszania aplikacji.</li>
+</ul>
+<h3 id="42-detekcja-wycieków-privacy-first-meta-logowanie">4.2. Detekcja Wycieków &quot;Privacy-First&quot; (Meta-logowanie)</h3>
+<p>Jak śledzić, czy dane użytkownika wyciekły na podejrzanej stronie, bez jednoczesnego zagrażania jego prywatności archiwizując same wartości?</p>
+<ul>
+<li><strong>Rozwiązanie:</strong> Zbieramy wyłącznie metadane. Mechanizmy we wtyczce przechwytują pola formularzy (hasła, e-maile, dane karty kredytowej) i klasyfikują je w <em>kategorie</em>.</li>
+<li>Do endpointu <code>/api/submitted-data</code> wysyłane są tylko tagi (np. <code>[&quot;EMAIL&quot;, &quot;PASSWORD&quot;]</code>) oraz adres URL formy. <strong>Prawdziwe dane nigdy nie opuszczają przeglądarki.</strong></li>
+</ul>
+<h3 id="43-pipeline-retroaktywnych-alertów-o-wyciekach-retroactive-leaks">4.3. Pipeline Retroaktywnych Alertów o Wyciekach (Retroactive Leaks)</h3>
+<p>Co się dzieje, jeśli ktoś założy konto na rzetelnie wyglądającej stronie w Poniedziałek, a w Środę zacznie ona wyłudzać dane i straci reputację?</p>
+<ul>
+<li><strong>Rozwiązanie:</strong> Za każdym razem, gdy AI zmienia <code>verdict</code> domeny na niebezpieczny (<code>phishing</code>, <code>suspicious</code>), na backendzie uruchamia się funkcja <code>backfillLeakAlertsForSite</code>.</li>
+<li>Asynchronicznie przeskakuje on po logach metadanych historycznych sesji użytkowników. Każdy z użytkowników, na którego logu znajdą się ślady wysłania danych do tej podejrzanej już po czasie domeny, natychmiastowo otrzymuje Alert Bezpieczeństwa widoczny w jego Web Dashboardzie.</li>
+</ul>
+<h3 id="44-backend-driven-writes--defense-in-depth-rls">4.4. Backend-Driven Writes &amp; Defense-in-Depth (RLS)</h3>
+<p>Klasyczne aplikacje Supabase po prostu piszą z przeglądarki prosto do bazy z autoryzacją po API konfigurowanej w RLS. W rozwiązaniu Enterprise Security to podejście ma bardzo słabą sterowalność dla reguł biznesowych.</p>
+<ul>
+<li>U nas pisze do bazy tylko Fastify przy użyciu trybu uprzywilejowanego (<code>service_role</code>), byśmy mieli pełną kontrolę nad zdarzeniami ubocznymi takimi jak punkt 4.3.</li>
+<li>Jednakże – z poziomu Bazy Danych nadal obowiązuje silne reguły RLS na wszystkich tabelach dla poszczególnych requestów zapytania użytkowników (Defense-in-depth). Posiadając sam token nikt nie może czytać niczego poza swoimi limitami!</li>
+</ul>
+<hr>
+<h2 id="5-model-bezpieczeństwa-i-reprezentacja-danych">5. Model Bezpieczeństwa i Reprezentacja Danych</h2>
+<p>Relacyjna baza danych została starannie zaprojektowana do obsługi masowej ilości odczytów logów i powiadomień. Poniżej omówienie najważniejszych struktur:</p>
+<h3 id="51-tabele-głównych-bytów">5.1. Tabele Głównych Bytów</h3>
+<ul>
+<li><strong><code>auth.users</code> / <code>user_profiles</code></strong>: Podstawowy profil logującego się użytkownika rozszerzony przez automatyczne triggery Postgres nasłuchujące operacji Auth.</li>
+<li><strong><code>groups</code> &amp; <code>group_members</code></strong>: Moduł wspierający aplikacje B2B Enterprise (Organizacja) i nadzór rodzicielski. Grupa pozwala zrzeszać członków według uprawnień (<code>admin</code>, <code>member</code>, <code>child</code>).</li>
+<li><strong><code>scanned_sites</code> &amp; <code>site_verdicts</code></strong>: Globalne repozytorium odwiedzonych witryn. Mechanizmy wymuszają tylko jednen oficjalny &quot;Werdykt&quot; na witrynę w odpowiednim cyklu. Pełni bazę całego logu i mechanizmu weryfikacyjnego.</li>
+<li><strong><code>scan_history</code></strong>: Tabela asocjacyjna. Log, trzymająca w rejestrze informację o tym &quot;Kto, Kiedy odwiedził Daną Stronę&quot;, dzięki czemu frontend może z dużą precyzją wyrysować Dashboard.</li>
+<li><strong><code>submitted_data_log</code> &amp; <code>leak_alerts</code></strong>: Główne tabele przechowujące zasygnalizowane próby wycieku (patrz Pkt 4.2).</li>
+</ul>
+<h3 id="52-rbac-role-based-access-control">5.2. RBAC (Role-Based Access Control)</h3>
+<p>W systemie na backendzie obowiązuje ścisły restrykcyjny model kontroli ról oparty o członkostwo Grupowe. Skrypty używają helpera <code>getMembership(groupId, userId)</code>, zanim cokolwiek z bazy udostępnią użytkownikom, w dodatku system ma zabezpieczenie uniemożliwiające usunięcie ostatniego Admina w przedsiębiorstwie by zapobiec tzw. soft-lockom.</p>
+<hr>
+<h2 id="6-endpoiny--architektura-api">6. Endpoiny / Architektura API</h2>
+<p>Aplikacja ma udokumentowane ponad 25 endpointów podzielonych ze względu na domeny. Standardowy cykl wyklucza ruch nieautoryzowany oprócz procesów rejestracji logowania – wszystko działa z JWT standardem <code>Bearer</code>.</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Domena</th>
+<th style="text-align:left">Metoda</th>
+<th style="text-align:left">Rozszerzenie</th>
+<th style="text-align:left">Cel Endpointu</th>
+<th style="text-align:left">Auth</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>Auth</strong></td>
+<td style="text-align:left">POST</td>
+<td style="text-align:left"><code>/api/auth/login</code></td>
+<td style="text-align:left">Wykonuje operacje autoryzacyjne, wystawia Access i Refresh Tokeny.</td>
+<td style="text-align:left">Brak</td>
+</tr>
+<tr>
+<td style="text-align:left"></td>
+<td style="text-align:left">GET</td>
+<td style="text-align:left"><code>/api/auth/me</code></td>
+<td style="text-align:left">Informacje o własnym profilu.</td>
+<td style="text-align:left">Tak</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Scan</strong></td>
+<td style="text-align:left">POST</td>
+<td style="text-align:left"><code>/api/scan</code></td>
+<td style="text-align:left">Trigger do analizy (AI lub Heurystyka lub Cache).</td>
+<td style="text-align:left">Tak</td>
+</tr>
+<tr>
+<td style="text-align:left"></td>
+<td style="text-align:left">POST</td>
+<td style="text-align:left"><code>/api/scan/extension-result</code></td>
+<td style="text-align:left">Synchronizacyjne okienko od rozszerzenia posiadającego samodzielny wynik lokalny na pokładzie przeglądarki.</td>
+<td style="text-align:left">Tak</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Leaks</strong></td>
+<td style="text-align:left">POST</td>
+<td style="text-align:left"><code>/api/submitted-data</code></td>
+<td style="text-align:left">Wchodzi event Logowania Formularzowych danych wg klas i regexu bez podawania inputu &quot;własnościowego&quot;.</td>
+<td style="text-align:left">Tak</td>
+</tr>
+<tr>
+<td style="text-align:left"></td>
+<td style="text-align:left">GET</td>
+<td style="text-align:left"><code>/api/leaks/me</code></td>
+<td style="text-align:left">Pagowana oś zdarzeń Alertów bezpieczeństwa użytych w Panelu WWW.</td>
+<td style="text-align:left">Tak</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Stats</strong></td>
+<td style="text-align:left">GET</td>
+<td style="text-align:left"><code>/api/dashboard/stats</code></td>
+<td style="text-align:left">Skumulowane wyliczenia i optymalne pobranie wszystkich danych dla złożonych dashboardów Recharts do wdrożeń panelu WEB.</td>
+<td style="text-align:left">Tak</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="7-przewodnik-deweloperski-local-setup">7. Przewodnik Deweloperski (Local Setup)</h2>
+<h3 id="71-wymagania-środowiska">7.1. Wymagania Środowiska</h3>
+<ul>
+<li>Node.js v20+</li>
+<li>Supabase Account z dostępną dedykowaną pod projekt Bazą (PostgreSQL)</li>
+<li>Trzeba zaimplementować tzw DDL SQL z pliku <code>database.txt</code> w środowisku zapytań Supabase.</li>
+</ul>
+<h3 id="72-konfiguracja-env">7.2. Konfiguracja <code>.env</code></h3>
+<p>W folderze <code>/backend</code> utwórz plik <code>.env</code> na podstawie pliku wzorcowego.
+Przykładowy szablon:</p>
+<pre class="hljs"><code><div><span class="hljs-attr">SUPABASE_URL</span>=https://&lt;twój-projekt-sup&gt;.supabase.co
+<span class="hljs-attr">SUPABASE_ANON_KEY</span>=eyJhb...
+<span class="hljs-comment"># Sekrecik serwerowy absolutnie nie powinien trafić do FEu (zastępstwo admin)</span>
+<span class="hljs-attr">SUPABASE_SERVICE_ROLE_KEY</span>=eyJhb... 
+<span class="hljs-attr">PORT</span>=<span class="hljs-number">3001</span>
+<span class="hljs-attr">CORS_ORIGINS</span>=http://localhost:<span class="hljs-number">3000</span>
+<span class="hljs-attr">AI_SCAN_TIMEOUT_MS</span>=<span class="hljs-number">30000</span>
+<span class="hljs-attr">SCAN_CACHE_TTL_HOURS</span>=<span class="hljs-number">24</span>
+</div></code></pre>
+<h3 id="73-bootstrapping-i-seedy">7.3. Bootstrapping i Seedy</h3>
+<p>W celu najlepszego przetestowania Dashboardu konieczne jest odpalenie skryptu zraszającego, tzw &quot;Mega Seedu&quot;. Używa algorytmów pseudolosowych do deterministycznego wygenerowania 16 użytkowników, tysięcy stron i fałszywych logów, co natychmiast ożywi panele!</p>
+<pre class="hljs"><code><div><span class="hljs-built_in">cd</span> backend
+npm install
+npm run seed  <span class="hljs-comment"># Wypełnia całą zdefiniowaną wyżej Bazę przykładowymi danymi i upewnia demówki.</span>
+npm run dev   <span class="hljs-comment"># Podnosi port :3001 -&gt; Logujemy się w dev.</span>
+</div></code></pre>
+<p><em>Wartościowe Konto Demo z Uprawnieniami:</em> <code>ceo@company.com</code> (Hasło: <code>Password123!</code>)</p>
+<h3 id="74-panel-dashboardu">7.4. Panel Dashboardu</h3>
+<pre class="hljs"><code><div><span class="hljs-built_in">cd</span> frontend
+npm install
+<span class="hljs-comment"># API bazowe zaciąga się standardowo z loclahosta portu:3001 (Można to spatchować w dotenvie FE jeśli backend jest wystawiony indziej)</span>
+npm run dev   <span class="hljs-comment"># Podnosi Next.js port: 3000</span>
+</div></code></pre>
+<h3 id="75-dodawanie-the-rozszerzenia">7.5. Dodawanie the Rozszerzenia</h3>
+<p>By testować bezpośrednio moduł manifestowy: Wchodzisz w Chromium w ustawienia <code>chrome://extensions/</code>, <strong>Włączasz tryb dewelopera</strong>, A następnie ładujesz odpakowane po czym zaznaczasz folder repozycyjny: <code>/wtyczka</code>.</p>
+
+</body>
+</html>
