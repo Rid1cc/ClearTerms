@@ -516,6 +516,41 @@ select {
   font-size: 13px;
 }
 
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+}
+
+.metric-value {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.metric-label {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.status-pill {
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  border: 1px solid var(--glass-border);
+  background: rgba(6, 12, 24, 0.45);
+}
+
+.status-pill--success {
+  border-color: rgba(110, 247, 199, 0.4);
+  color: var(--accent);
+}
+
+.status-pill--error {
+  border-color: rgba(255, 123, 123, 0.4);
+  color: var(--danger);
+}
+
 .card__actions {
   display: flex;
   gap: 10px;

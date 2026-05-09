@@ -1,6 +1,25 @@
+"use client";
+import { useEffect, useState } from "react";
 import Topbar from "../components/Topbar";
+import { apiRequest } from "../lib/api";
+import { getAccessToken } from "../lib/auth";
 
 export default function GroupsPage() {
+  const [groups, setGroups] = useState([]);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const token = getAccessToken();
+    if (!token) {
+      setError("Sign in to view groups.");
+      return;
+    }
+
+    apiRequest("/api/groups", { token })
+      .then(data => setGroups(data?.groups || []))
+      .catch(err => setError(err.message || "Unable to load groups."));
+  }, []);
+
   return (
     <div className="page">
       <div className="ambient">
@@ -22,7 +41,17 @@ export default function GroupsPage() {
                 <h3>Group list</h3>
                 <span className="chip">Overview</span>
               </div>
-              <div className="card__body">No groups yet.</div>
+              <div className="card__body">
+                {groups.length ? (
+                  <ul className="card__list">
+                    {groups.map(group => (
+                      <li key={group.id}>{group.name} - {group.role}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  error || "No groups yet."
+                )}
+              </div>
             </div>
             <div className="glass card">
               <div className="card__header">

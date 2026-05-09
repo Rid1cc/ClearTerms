@@ -1,6 +1,34 @@
+"use client";
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { apiRequest } from "../lib/api";
+import { clearTokens, getAccessToken } from "../lib/auth";
 
 export default function Topbar({ ctaLabel = "Sign in", ctaHref = "/login" }) {
+  const [hasSession, setHasSession] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+
+  useEffect(() => {
+    setHasSession(Boolean(getAccessToken()));
+  }, []);
+
+  const handleSignOut = async () => {
+    const token = getAccessToken();
+    setSigningOut(true);
+
+    try {
+      if (token) {
+        await apiRequest("/api/auth/logout", { method: "POST", token });
+      }
+    } catch (err) {
+      // Ignore logout errors and clear local tokens regardless.
+    } finally {
+      clearTokens();
+      setHasSession(false);
+      setSigningOut(false);
+    }
+  };
+
   return (
     <nav className="topbar glass reveal">
       <div className="brand">
@@ -14,7 +42,13 @@ export default function Topbar({ ctaLabel = "Sign in", ctaHref = "/login" }) {
         <Link className="ghost" href="/leaks">Leaks</Link>
         <Link className="ghost" href="/settings">Settings</Link>
       </div>
-      <Link className="btn btn--primary" href={ctaHref}>{ctaLabel}</Link>
+      {hasSession ? (
+        <button className="btn btn--ghost" onClick={handleSignOut} disabled={signingOut}>
+          {signingOut ? "Signing out..." : "Sign out"}
+        </button>
+      ) : (
+        <Link className="btn btn--primary" href={ctaHref}>{ctaLabel}</Link>
+      )}
     </nav>
   );
 }

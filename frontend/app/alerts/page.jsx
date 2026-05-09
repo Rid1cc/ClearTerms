@@ -1,6 +1,35 @@
+"use client";
+import { useEffect, useState } from "react";
 import Topbar from "../components/Topbar";
+import { apiRequest } from "../lib/api";
+import { getAccessToken } from "../lib/auth";
 
 export default function AlertsPage() {
+  const [alerts, setAlerts] = useState([]);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const token = getAccessToken();
+    if (!token) {
+      setError("Sign in to view alerts.");
+      return;
+    }
+
+    apiRequest("/api/groups", { token })
+      .then(data => data?.groups?.[0])
+      .then(group => {
+        if (!group) {
+          setError("No groups available.");
+          return null;
+        }
+        return apiRequest(`/api/groups/${group.id}/parental-alerts?limit=10&offset=0`, { token });
+      })
+      .then(payload => {
+        if (payload?.alerts) setAlerts(payload.alerts);
+      })
+      .catch(err => setError(err.message || "Unable to load alerts."));
+  }, []);
+
   return (
     <div className="page">
       <div className="ambient">
@@ -22,7 +51,17 @@ export default function AlertsPage() {
                 <h3>Alert feed</h3>
                 <span className="chip">Priority</span>
               </div>
-              <div className="card__body">No alerts available.</div>
+              <div className="card__body">
+                {alerts.length ? (
+                  <ul className="card__list">
+                    {alerts.map(alert => (
+                      <li key={alert.id}>{alert.site_url} - {alert.event_type}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  error || "No alerts available."
+                )}
+              </div>
             </div>
             <div className="glass card">
               <div className="card__header">

@@ -1,6 +1,25 @@
+"use client";
+import { useEffect, useState } from "react";
 import Topbar from "../components/Topbar";
+import { apiRequest } from "../lib/api";
+import { getAccessToken } from "../lib/auth";
 
 export default function SettingsPage() {
+  const [profile, setProfile] = useState(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const token = getAccessToken();
+    if (!token) {
+      setError("Sign in to manage settings.");
+      return;
+    }
+
+    apiRequest("/api/auth/me", { token })
+      .then(data => setProfile(data?.profile || null))
+      .catch(err => setError(err.message || "Unable to load profile."));
+  }, []);
+
   return (
     <div className="page">
       <div className="ambient">
@@ -26,10 +45,19 @@ export default function SettingsPage() {
             </div>
             <div className="glass card">
               <div className="card__header">
-                <h3>Retention</h3>
-                <span className="chip">Compliance</span>
+                <h3>Profile</h3>
+                <span className="chip">Account</span>
               </div>
-              <div className="card__body">Set data retention windows.</div>
+              <div className="card__body">
+                {profile ? (
+                  <ul className="card__list">
+                    <li>{profile.display_name || "Unnamed"}</li>
+                    <li>{profile.avatar_url ? "Avatar set" : "No avatar"}</li>
+                  </ul>
+                ) : (
+                  error || "No profile data."
+                )}
+              </div>
             </div>
             <div className="glass card">
               <div className="card__header">
