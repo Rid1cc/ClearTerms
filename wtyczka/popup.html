@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <title>ClearTerms</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 340px;
+      margin: 0;
+      padding: 14px;
+      color: #161616;
+      font-family: Arial, sans-serif;
+      background: #f7f7f4;
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    label {
+      display: block;
+      margin: 8px 0 4px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    input {
+      width: 100%;
+      padding: 9px;
+      border: 1px solid #c9c9c2;
+      border-radius: 6px;
+      background: white;
+      font-size: 13px;
+    }
+
+    button {
+      width: 100%;
+      min-height: 38px;
+      margin-top: 10px;
+      padding: 10px;
+      cursor: pointer;
+      border: none;
+      border-radius: 6px;
+      background: #1f2933;
+      color: white;
+      font-weight: 700;
+    }
+
+    button.secondary {
+      background: #deded6;
+      color: #1f2933;
+    }
+
+    button:disabled {
+      background: #8d928f;
+      cursor: not-allowed;
+    }
+
+    #account {
+      margin-bottom: 10px;
+      font-size: 12px;
+      color: #555b57;
+      word-break: break-word;
+    }
+
+    #status {
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px solid #deded6;
+      font-size: 13px;
+      line-height: 1.35;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>ClearTerms</h1>
+
+  <form id="loginForm">
+    <label for="email">Email</label>
+    <input id="email" type="email" autocomplete="email" required>
+
+    <label for="password">Hasło</label>
+    <input id="password" type="password" autocomplete="current-password" required>
+
+    <button id="loginBtn" type="submit">Zaloguj</button>
+  </form>
+
+  <div id="scanPanel" class="hidden">
+    <div id="account"></div>
+    <button id="scanBtn" type="button">Sprawdź tę stronę teraz</button>
+    <button id="logoutBtn" class="secondary" type="button">Wyloguj</button>
+  </div>
+
+  <div id="status">Gotowe do działania.</div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
