@@ -3,7 +3,7 @@ import { authenticate } from '../plugins/authenticate'
 import { supabaseAdmin } from '../config/supabase'
 import { config } from '../config/env'
 import { normalizeUrl } from '../utils/url'
-import { extensionScanResultSchema, scanRequestSchema } from '../schemas/scan'
+import { blacklistCheckSchema, extensionScanResultSchema, scanRequestSchema } from '../schemas/scan'
 import { analyzeUrl, AiAnalysisResult } from '../services/aiService'
 import { backfillLeakAlertsForSite } from '../services/submittedDataLeak'
 
@@ -58,6 +58,15 @@ interface CompanyAuditRow {
   sources: unknown
   reliability_score: number | null
   last_researched_at: string
+}
+
+interface PhishingBlacklistRow {
+  id: string
+  url: string | null
+  domain: string | null
+  source: string
+  reason: string | null
+  expires_at: string | null
 }
 
 function isFresh(lastAnalyzedAt: string | null): boolean {
@@ -311,10 +320,75 @@ function parseExtensionAnalysis(analysis: string): {
   return { score, verdict, summary }
 }
 
+function firstUnexpiredBlacklistRow(rows: PhishingBlacklistRow[] | null): PhishingBlacklistRow | null {
+  if (!rows?.length) return null
+  const now = Date.now()
+  return rows.find((row) => {
+    if (!row.expires_at) return true
+    return new Date(row.expires_at).getTime() > now
+  }) ?? null
+}
+
+async function findActiveBlacklistMatch(url: string, hash: string, domain: string): Promise<PhishingBlacklistRow | null> {
+  const select = 'id, url, domain, source, reason, expires_at'
+
+  const byHash = await supabaseAdmin
+    .from('phishing_blacklist')
+    .select(select)
+    .eq('is_active', true)
+    .eq('url_hash', hash)
+    .limit(10)
+
+  let match = firstUnexpiredBlacklistRow((byHash.data as PhishingBlacklistRow[] | null) ?? null)
+  if (match) return match
+
+  const byUrl = await supabaseAdmin
+    .from('phishing_blacklist')
+    .select(select)
+    .eq('is_active', true)
+    .eq('url', url)
+    .limit(10)
+
+  match = firstUnexpiredBlacklistRow((byUrl.data as PhishingBlacklistRow[] | null) ?? null)
+  if (match) return match
+
+  const byDomain = await supabaseAdmin
+    .from('phishing_blacklist')
+    .select(select)
+    .eq('is_active', true)
+    .eq('domain', domain)
+    .limit(10)
+
+  return firstUnexpiredBlacklistRow((byDomain.data as PhishingBlacklistRow[] | null) ?? null)
+}
+
 // ---------------------------------------------------------------------
 // Route
 // ---------------------------------------------------------------------
 export default async function scanRoutes(fastify: FastifyInstance) {
+  fastify.post('/scan/blacklist-check', async (request, reply) => {
+    const result = blacklistCheckSchema.safeParse(request.body)
+    if (!result.success) {
+      return reply.code(400).send({ error: 'Validation error', details: result.error.flatten() })
+    }
+
+    let normalized
+    try {
+      normalized = normalizeUrl(result.data.url)
+    } catch {
+      return reply.code(400).send({ error: 'Invalid URL' })
+    }
+
+    const match = await findActiveBlacklistMatch(normalized.url, normalized.hash, normalized.domain)
+
+    return {
+      blocked: Boolean(match),
+      domain: normalized.domain,
+      reason: match?.reason ?? null,
+      source: match?.source ?? null,
+    }
+  })
+
   fastify.post('/scan/extension-result', { preHandler: [authenticate] }, async (request, reply) => {
     const result = extensionScanResultSchema.safeParse(request.body)
     if (!result.success) {

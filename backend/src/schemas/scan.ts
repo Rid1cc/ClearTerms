@@ -14,5 +14,10 @@ export const extensionScanResultSchema = z.object({
   analysis: z.string().min(1).max(50_000),
 })
 
+export const blacklistCheckSchema = z.object({
+  url: z.string().min(1).max(2048),
+})
+
 export type ScanRequest = z.infer<typeof scanRequestSchema>
 export type ExtensionScanResult = z.infer<typeof extensionScanResultSchema>
+export type BlacklistCheck = z.infer<typeof blacklistCheckSchema>
