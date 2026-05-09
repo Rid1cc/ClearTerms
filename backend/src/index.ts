@@ -4,6 +4,7 @@ import { config } from './config/env'
 import authRoutes from './routes/auth'
 import groupRoutes from './routes/groups'
 import scanRoutes from './routes/scan'
+import leaksRoutes from './routes/leaks'
 
 const app = Fastify({
   logger: {
@@ -25,6 +26,7 @@ async function start() {
   await app.register(authRoutes, { prefix: '/api' })
   await app.register(groupRoutes, { prefix: '/api' })
   await app.register(scanRoutes, { prefix: '/api' })
+  await app.register(leaksRoutes, { prefix: '/api' })
 
   // Health check — no auth required
   app.get('/health', async () => ({

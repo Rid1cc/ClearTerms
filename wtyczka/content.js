@@ -118,3 +118,103 @@ if (document.readyState === "loading") {
 } else {
   setTimeout(notifyPageLoaded, 1200);
 }
+
+// ---------------------------------------------------------------------------
+// Log kategorii danych z formularzy (bez wartości) → POST /api/submitted-data
+// ---------------------------------------------------------------------------
+
+function inferDataCategoriesFromForm(form) {
+  const categories = new Set();
+  const controls = form.querySelectorAll("input, select, textarea");
+
+  controls.forEach((el) => {
+    if (!(el instanceof HTMLElement)) return;
+    if (el.hasAttribute("disabled")) return;
+
+    const tag = el.tagName.toLowerCase();
+    const type = (el.getAttribute("type") || "text").toLowerCase();
+    if (type === "hidden" || type === "submit" || type === "button" || type === "reset" || type === "image") {
+      return;
+    }
+
+    const name = (el.getAttribute("name") || "").toLowerCase();
+    const ac = (el.getAttribute("autocomplete") || "").toLowerCase();
+    const id = (el.getAttribute("id") || "").toLowerCase();
+    const key = `${name} ${id} ${ac}`;
+
+    if (type === "email" || ac.includes("email")) {
+      categories.add("email");
+    } else if (type === "password") {
+      categories.add("password");
+    } else if (type === "tel" || ac.includes("tel") || ac === "mobile-phone") {
+      categories.add("phone");
+    } else if (type === "date" || ac.includes("bday")) {
+      categories.add("date_of_birth");
+    } else if (
+      key.includes("credit") ||
+      key.includes("card") ||
+      key.includes("ccnumber") ||
+      ac.includes("cc-")
+    ) {
+      categories.add("credit_card");
+    } else if (
+      key.includes("iban") ||
+      key.includes("bank") ||
+      (key.includes("account") && !key.includes("username")) ||
+      ac.includes("bank")
+    ) {
+      categories.add("bank_account");
+    } else if (
+      key.includes("pesel") ||
+      key.includes("ssn") ||
+      key.includes("national") ||
+      ac.includes("national-id")
+    ) {
+      categories.add("national_id");
+    } else if (
+      key.includes("address") ||
+      key.includes("street") ||
+      key.includes("zip") ||
+      key.includes("postal") ||
+      ac.includes("address")
+    ) {
+      categories.add("address");
+    } else if (
+      (key.includes("name") || ac.includes("name")) &&
+      !key.includes("username") &&
+      !ac.includes("username")
+    ) {
+      categories.add("full_name");
+    } else if (
+      tag === "textarea" &&
+      (key.includes("message") || key.includes("comment") || key.includes("bio"))
+    ) {
+      categories.add("other");
+    }
+  });
+
+  return Array.from(categories);
+}
+
+document.addEventListener(
+  "submit",
+  (event) => {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement)) return;
+    if (!isScannablePage()) return;
+
+    const dataCategories = inferDataCategoriesFromForm(form);
+    if (!dataCategories.length) return;
+
+    chrome.runtime
+      .sendMessage({
+        action: "submittedData",
+        data: {
+          site_url: window.location.href,
+          data_categories: dataCategories
+        }
+      })
+      .catch(() => {});
+  },
+  true
+);

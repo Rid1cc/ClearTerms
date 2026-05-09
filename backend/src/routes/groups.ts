@@ -198,17 +198,46 @@ export default async function groupRoutes(fastify: FastifyInstance) {
       const membership = await getMembership(params.data.id, request.user!.id)
       if (!membership) return reply.code(404).send({ error: 'Group not found' })
 
-      const { data, error } = await supabaseAdmin
+      // `group_members.user_id` references `auth.users`, not `user_profiles`, so PostgREST
+      // cannot embed profiles in one query. Fetch rows and profiles separately.
+      const { data: rows, error } = await supabaseAdmin
         .from('group_members')
-        .select(
-          'user_id, role, joined_at, profile:user_profiles(display_name, avatar_url)'
-        )
+        .select('user_id, role, joined_at')
         .eq('group_id', params.data.id)
         .order('joined_at', { ascending: true })
 
       if (error) return reply.code(500).send({ error: 'Failed to fetch members' })
 
-      return { members: data ?? [] }
+      const membersList = rows ?? []
+      const userIds = [...new Set(membersList.map((m) => m.user_id))]
+
+      const profileByUserId = new Map<
+        string,
+        { display_name: string | null; avatar_url: string | null }
+      >()
+
+      if (userIds.length > 0) {
+        const { data: profiles, error: profilesError } = await supabaseAdmin
+          .from('user_profiles')
+          .select('id, display_name, avatar_url')
+          .in('id', userIds)
+
+        if (profilesError) return reply.code(500).send({ error: 'Failed to fetch members' })
+
+        for (const p of profiles ?? []) {
+          profileByUserId.set(p.id, {
+            display_name: p.display_name,
+            avatar_url: p.avatar_url,
+          })
+        }
+      }
+
+      return {
+        members: membersList.map((m) => ({
+          ...m,
+          profile: profileByUserId.get(m.user_id) ?? null,
+        })),
+      }
     }
   )
 

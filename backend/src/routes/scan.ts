@@ -5,6 +5,7 @@ import { config } from '../config/env'
 import { normalizeUrl } from '../utils/url'
 import { scanRequestSchema } from '../schemas/scan'
 import { analyzeUrl, AiAnalysisResult } from '../services/aiService'
+import { backfillLeakAlertsForSite } from '../services/submittedDataLeak'
 
 // ---------------------------------------------------------------------
 // Helpers
@@ -407,6 +408,8 @@ export default async function scanRoutes(fastify: FastifyInstance) {
       })
       .select('id, verdict, score, summary, red_flags, data_processing_countries, analyzed_at')
       .single()
+
+    await backfillLeakAlertsForSite(site.id, ai.verdict)
 
     let privacy: PrivacyAnalysisRow | null = null
     if (ai.privacy_policy) {

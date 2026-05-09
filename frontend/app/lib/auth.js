@@ -18,4 +18,11 @@ export function clearTokens() {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem("access_token");
   window.localStorage.removeItem("refresh_token");
+  window.dispatchEvent(new CustomEvent("clearterms:logout"));
+}
+
+/** Routes that do not require a session (everything else redirects when tokens are gone). */
+export function isPublicPath(pathname) {
+  if (!pathname) return true;
+  return pathname === "/" || pathname === "/login";
 }

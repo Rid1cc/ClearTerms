@@ -1,8 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
-import Topbar from "../components/Topbar";
-import { apiRequest } from "../lib/api";
-import { getAccessToken } from "../lib/auth";
+import Topbar from "../../components/Topbar";
+import { apiRequest } from "../../lib/api";
+import { getAccessToken } from "../../lib/auth";
 
 export default function SettingsPage() {
   const [profile, setProfile] = useState(null);
@@ -22,11 +22,6 @@ export default function SettingsPage() {
 
   return (
     <div className="page">
-      <div className="ambient">
-        <div className="orb orb--a" />
-        <div className="orb orb--b" />
-        <div className="orb orb--c" />
-      </div>
       <section className="section">
         <div className="container">
           <Topbar ctaLabel="Sign in" ctaHref="/login" />

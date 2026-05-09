@@ -33,6 +33,8 @@ async function handleMessage(message, sender) {
       return getAuthState();
     case "getLatestScan":
       return getLatestScan();
+    case "submittedData":
+      return reportSubmittedData(message.data);
     default:
       return undefined;
   }
@@ -185,6 +187,26 @@ async function getAuthState() {
     loggedIn: Boolean(auth.accessToken),
     email: auth.userEmail || null
   };
+}
+
+async function reportSubmittedData(data) {
+  if (!data || !data.site_url || !Array.isArray(data.data_categories) || !data.data_categories.length) {
+    return { success: false, skipped: true };
+  }
+
+  try {
+    await apiFetch("/api/submitted-data", {
+      method: "POST",
+      body: {
+        site_url: data.site_url,
+        data_categories: data.data_categories
+      }
+    });
+    return { success: true };
+  } catch (error) {
+    console.warn("Nie zapisano logu przekazanych danych:", error);
+    return { success: false, error: error.message || "Błąd zapisu" };
+  }
 }
 
 async function getLatestScan() {
