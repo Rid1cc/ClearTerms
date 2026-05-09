@@ -23,10 +23,10 @@ import { apiRequest } from "../../lib/api";
 import { getAccessToken } from "../../lib/auth";
 
 const VERDICT_LABEL = {
-  safe: "Bezpieczne",
-  suspicious: "Podejrzane",
+  safe: "Safe",
+  suspicious: "Suspicious",
   phishing: "Phishing",
-  unknown: "Nieznane",
+  unknown: "Unknown",
 };
 
 const VERDICT_COLOR = {
@@ -37,10 +37,10 @@ const VERDICT_COLOR = {
 };
 
 const SEVERITY_LABEL = {
-  critical: "Krytyczne",
-  high: "Wysokie",
-  medium: "Średnie",
-  low: "Niskie",
+  critical: "Critical",
+  high: "High",
+  medium: "Medium",
+  low: "Low",
 };
 
 const SEVERITY_COLOR = {
@@ -51,21 +51,21 @@ const SEVERITY_COLOR = {
 };
 
 const CATEGORY_LABEL = {
-  email: "E-mail",
-  password: "Hasło",
-  phone: "Telefon",
-  full_name: "Imię i nazwisko",
-  address: "Adres",
-  date_of_birth: "Data urodzenia",
-  national_id: "PESEL / ID",
-  credit_card: "Karta",
-  other: "Inne",
+  email: "Email",
+  password: "Password",
+  phone: "Phone",
+  full_name: "Full name",
+  address: "Address",
+  date_of_birth: "Date of birth",
+  national_id: "National ID",
+  credit_card: "Credit card",
+  other: "Other",
 };
 
 const WINDOW_OPTIONS = [
-  { label: "7 dni", value: 7 },
-  { label: "30 dni", value: 30 },
-  { label: "90 dni", value: 90 },
+  { label: "7 days", value: 7 },
+  { label: "30 days", value: 30 },
+  { label: "90 days", value: 90 },
 ];
 
 function ChartTooltip({ active, payload, label }) {
@@ -151,7 +151,7 @@ function SectionTitle({ title, chip, action }) {
 }
 
 export default function DashboardPage() {
-  const [status, setStatus] = useState({ state: "signed-out", message: "Łączenie…" });
+  const [status, setStatus] = useState({ state: "signed-out", message: "Connecting…" });
   const [stats, setStats] = useState(null);
   const [activity, setActivity] = useState(null);
   const [submissions, setSubmissions] = useState(null);
@@ -167,7 +167,7 @@ export default function DashboardPage() {
   useEffect(() => {
     const token = getAccessToken();
     if (!token) {
-      setStatus({ state: "signed-out", message: "Zaloguj się, aby zobaczyć dane." });
+      setStatus({ state: "signed-out", message: "Sign in to view your data." });
       setLoading(false);
       return;
     }
@@ -176,9 +176,9 @@ export default function DashboardPage() {
       setLoading(true);
       try {
         await apiRequest("/health");
-        setStatus({ state: "connected", message: "Połączono z API" });
+        setStatus({ state: "connected", message: "Connected to API" });
       } catch {
-        setStatus({ state: "disconnected", message: "API niedostępne" });
+        setStatus({ state: "disconnected", message: "API unavailable" });
       }
 
       try {
@@ -204,7 +204,7 @@ export default function DashboardPage() {
         setDataMap(mapData);
         setLeakSev(leakSevData);
       } catch {
-        // zostawiamy częściowe dane
+        // keep partial data on error
       } finally {
         setLoading(false);
       }
@@ -287,15 +287,15 @@ export default function DashboardPage() {
     <div className="page">
       <section className="section" style={{ paddingTop: 64 }}>
         <div className="container">
-          <Topbar ctaLabel="Zaloguj" ctaHref="/login" />
+          <Topbar ctaLabel="Sign in" ctaHref="/login" />
 
           <div className="dashboard__hero glass reveal">
             <div className="dashboard__hero-glow" aria-hidden style={{ background: `radial-gradient(circle at 80% 20%, ${heroAccent}33, transparent 60%)` }} />
             <div className="dashboard__hero-content">
               <div className="eyebrow">Dashboard</div>
-              <h2 style={{ margin: "0 0 6px" }}>{profileName ? `Cześć, ${profileName}` : "Przegląd bezpieczeństwa"}</h2>
+              <h2 style={{ margin: "0 0 6px" }}>{profileName ? `Hi, ${profileName}` : "Security overview"}</h2>
               <p className="muted" style={{ margin: 0 }}>
-                Skany, werdykty i ryzyko w jednym miejscu — okno {windowDays} dni.
+                Scans, verdicts and risk in one place — last {windowDays} days.
               </p>
               <div className="status-indicator" style={{ marginTop: 14 }}>
                 <span
@@ -303,7 +303,7 @@ export default function DashboardPage() {
                     status.state === "connected" ? "status-dot--ok" : "status-dot--off"
                   }`}
                 />
-                <span>{status.state === "connected" ? "Aktywna sesja" : "Status"}</span>
+                <span>{status.state === "connected" ? "Active session" : "Status"}</span>
                 <span className="muted">{status.message}</span>
               </div>
             </div>
@@ -340,7 +340,7 @@ export default function DashboardPage() {
                 </svg>
               </div>
 
-              <div className="dashboard__windows" role="tablist" aria-label="Zakres czasu">
+              <div className="dashboard__windows" role="tablist" aria-label="Time range">
                 {WINDOW_OPTIONS.map((w) => (
                   <button
                     key={w.value}
@@ -363,44 +363,44 @@ export default function DashboardPage() {
             style={{ gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))" }}
           >
             <KpiCard
-              label="Skany łącznie"
+              label="Total scans"
               value={loading ? "…" : stats?.total_scans ?? "—"}
               hint="All time"
               accent="#67b7ff"
               delay={0.05}
             />
             <KpiCard
-              label={`Skany (${windowDays} dni)`}
+              label={`Scans (${windowDays}d)`}
               value={loading ? "…" : stats?.scans_in_window ?? "—"}
-              hint="Okno"
+              hint="Window"
               accent="#6ef7c7"
               delay={0.1}
             />
             <KpiCard
-              label="Zagrożenia w oknie"
+              label="Threats in window"
               value={loading ? "…" : stats?.threats_in_window ?? "—"}
               hint="Phish / suspicious"
               accent="#ff7b7b"
               delay={0.15}
             />
             <KpiCard
-              label="Otwarte alerty wycieków"
+              label="Open leak alerts"
               value={loading ? "…" : stats?.open_leak_alerts ?? "—"}
               hint="Leaks"
               accent="#ffae6e"
               delay={0.2}
             />
             <KpiCard
-              label="Grupy"
+              label="Groups"
               value={loading ? "…" : stats?.groups_count ?? "—"}
               hint="Workspace"
               accent="#67b7ff"
               delay={0.25}
             />
             <KpiCard
-              label="Wysłane formularze"
+              label="Form submissions"
               value={loading ? "…" : stats?.submissions_in_window ?? "—"}
-              hint="Kategorie danych"
+              hint="Data categories"
               accent="#ffd166"
               delay={0.3}
             />
@@ -408,7 +408,7 @@ export default function DashboardPage() {
 
           <div className="section-grid" style={{ gridTemplateColumns: "minmax(0, 2fr) minmax(0, 1fr)", gap: 16 }}>
             <div className="glass card reveal" style={{ minHeight: 340, animationDelay: "0.05s" }}>
-              <SectionTitle title="Aktywność skanów" chip="Dziennie" />
+              <SectionTitle title="Scan activity" chip="Daily" />
               <div className="card__body" style={{ height: 280, marginTop: 4 }}>
                 {activityData.length ? (
                   <ResponsiveContainer width="100%" height="100%">
@@ -430,7 +430,7 @@ export default function DashboardPage() {
                       <Area
                         type="monotone"
                         dataKey="scans"
-                        name="Skany"
+                        name="Scans"
                         stroke="#67b7ff"
                         fill="url(#fillScans)"
                         strokeWidth={2}
@@ -438,7 +438,7 @@ export default function DashboardPage() {
                       <Area
                         type="monotone"
                         dataKey="threats"
-                        name="Wysokie ryzyko"
+                        name="High risk"
                         stroke="#ff7b7b"
                         fill="url(#fillThreats)"
                         strokeWidth={2}
@@ -446,13 +446,13 @@ export default function DashboardPage() {
                     </AreaChart>
                   </ResponsiveContainer>
                 ) : (
-                  <EmptyChart text="Brak skanów w wybranym oknie — użyj wtyczki lub uruchom seed." />
+                  <EmptyChart text="No scans in this window — use the extension or run the seed." />
                 )}
               </div>
             </div>
 
             <div className="glass card reveal" style={{ minHeight: 340, animationDelay: "0.1s" }}>
-              <SectionTitle title="Werdykty" chip={`${windowDays} dni`} />
+              <SectionTitle title="Verdicts" chip={`${windowDays}d`} />
               <div className="card__body" style={{ marginTop: 4 }}>
                 {pieData.length ? (
                   <>
@@ -490,7 +490,7 @@ export default function DashboardPage() {
                     </ul>
                   </>
                 ) : (
-                  <EmptyChart text="Brak werdyktów w wybranym oknie." />
+                  <EmptyChart text="No verdicts in this window." />
                 )}
               </div>
             </div>
@@ -498,7 +498,7 @@ export default function DashboardPage() {
 
           <div className="section-grid" style={{ gridTemplateColumns: "minmax(0, 2fr) minmax(0, 1fr)", gap: 16 }}>
             <div className="glass card reveal" style={{ minHeight: 320, animationDelay: "0.15s" }}>
-              <SectionTitle title="Wysłane dane — trend" chip="Formularze / dzień" />
+              <SectionTitle title="Submitted data trend" chip="Forms / day" />
               <div className="card__body" style={{ height: 260, marginTop: 4 }}>
                 {submissionData.length ? (
                   <ResponsiveContainer width="100%" height="100%">
@@ -517,18 +517,18 @@ export default function DashboardPage() {
                       <XAxis dataKey="label" tick={{ fill: "#94a3b8", fontSize: 11 }} axisLine={false} tickLine={false} />
                       <YAxis tick={{ fill: "#94a3b8", fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
                       <Tooltip content={<ChartTooltip />} labelFormatter={(_, p) => p?.[0]?.payload?.date} />
-                      <Bar dataKey="submissions" name="Formularze" fill="url(#barSubmissions)" radius={[6, 6, 0, 0]} />
-                      <Bar dataKey="risky" name="Ryzykowne" fill="url(#barRisky)" radius={[6, 6, 0, 0]} />
+                      <Bar dataKey="submissions" name="Forms" fill="url(#barSubmissions)" radius={[6, 6, 0, 0]} />
+                      <Bar dataKey="risky" name="Risky" fill="url(#barRisky)" radius={[6, 6, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 ) : (
-                  <EmptyChart text="Brak zgłoszeń formularzy w tym oknie." />
+                  <EmptyChart text="No form submissions in this window." />
                 )}
               </div>
             </div>
 
             <div className="glass card reveal" style={{ minHeight: 320, animationDelay: "0.2s" }}>
-              <SectionTitle title="Najczęstsze kategorie danych" chip={`${windowDays} dni`} />
+              <SectionTitle title="Top data categories" chip={`${windowDays}d`} />
               <div className="card__body" style={{ marginTop: 4 }}>
                 {categoriesData.length ? (
                   <ul className="dashboard__bars">
@@ -549,7 +549,7 @@ export default function DashboardPage() {
                     })}
                   </ul>
                 ) : (
-                  <EmptyChart text="Brak danych kategorii — pojawi się po zgłoszeniach." />
+                  <EmptyChart text="No category data — appears after submissions." />
                 )}
               </div>
             </div>
@@ -557,7 +557,7 @@ export default function DashboardPage() {
 
           <div className="section-grid" style={{ gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr)", gap: 16 }}>
             <div className="glass card reveal" style={{ animationDelay: "0.25s" }}>
-              <SectionTitle title="Ostatnie skany" chip="Oś czasu" />
+              <SectionTitle title="Recent scans" chip="Timeline" />
               <div className="card__body">
                 {history.length ? (
                   <ul className="dashboard__history">
@@ -590,13 +590,13 @@ export default function DashboardPage() {
                     })}
                   </ul>
                 ) : (
-                  <p className="muted" style={{ margin: 0 }}>Brak historii skanów.</p>
+                  <p className="muted" style={{ margin: 0 }}>No scan history.</p>
                 )}
               </div>
             </div>
 
             <div className="glass card reveal" style={{ animationDelay: "0.3s", minHeight: 300 }}>
-              <SectionTitle title="Najgorsze strony" chip="Wynik" />
+              <SectionTitle title="Worst sites" chip="Score" />
               <div className="card__body" style={{ height: 270 }}>
                 {threats.length ? (
                   <ResponsiveContainer width="100%" height="100%">
@@ -639,15 +639,15 @@ export default function DashboardPage() {
                     </BarChart>
                   </ResponsiveContainer>
                 ) : (
-                  <EmptyChart text="Brak stron z podwyższonym ryzykiem." />
+                  <EmptyChart text="No elevated-risk sites." />
                 )}
               </div>
             </div>
 
             <div className="glass card reveal" style={{ animationDelay: "0.35s", minHeight: 300 }}>
               <SectionTitle
-                title="Wycieki — severity"
-                chip={leakSev?.total != null ? `${leakSev.total} alertów` : "Leak alerts"}
+                title="Leak severity"
+                chip={leakSev?.total != null ? `${leakSev.total} alerts` : "Leak alerts"}
               />
               <div className="card__body" style={{ marginTop: 4 }}>
                 {severityData.length ? (
@@ -677,24 +677,24 @@ export default function DashboardPage() {
                     </div>
                     <div className="dashboard__sev-meta">
                       <div>
-                        <span className="muted">Otwarte</span>
+                        <span className="muted">Open</span>
                         <strong style={{ color: "var(--danger)" }}>{leakSev?.open ?? 0}</strong>
                       </div>
                       <div>
-                        <span className="muted">Potwierdzone</span>
+                        <span className="muted">Acknowledged</span>
                         <strong style={{ color: "var(--accent)" }}>{leakSev?.acknowledged ?? 0}</strong>
                       </div>
                     </div>
                   </>
                 ) : (
-                  <EmptyChart text="Brak alertów wycieków — wszystko czyste." />
+                  <EmptyChart text="No leak alerts — all clear." />
                 )}
               </div>
             </div>
           </div>
 
           <div className="glass card reveal" style={{ animationDelay: "0.4s" }}>
-            <SectionTitle title="Przetwarzanie danych — kraje (z werdyktów)" chip="90 dni" />
+            <SectionTitle title="Data processing countries (from verdicts)" chip="90d" />
             <div className="card__body" style={{ height: 280 }}>
               {countryChartData.length ? (
                 <ResponsiveContainer width="100%" height="100%">
@@ -709,11 +709,11 @@ export default function DashboardPage() {
                     <XAxis dataKey="label" tick={{ fill: "#94a3b8", fontSize: 11 }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fill: "#94a3b8", fontSize: 11 }} allowDecimals={false} axisLine={false} tickLine={false} />
                     <Tooltip content={<ChartTooltip />} />
-                    <Bar dataKey="total_submissions" name="Wystąpień w skanach" fill="url(#barCountries)" radius={[8, 8, 0, 0]} />
+                    <Bar dataKey="total_submissions" name="Occurrences in scans" fill="url(#barCountries)" radius={[8, 8, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <EmptyChart text="Brak krajów w werdyktach — pojawi się po pełnych skanach." />
+                <EmptyChart text="No country data in verdicts — appears after full scans." />
               )}
             </div>
           </div>

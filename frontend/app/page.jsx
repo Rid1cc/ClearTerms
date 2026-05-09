@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Topbar from "./components/Topbar";
+import InstantUrlCheck from "./components/InstantUrlCheck";
 
 export default function HomePage() {
   return (
@@ -42,31 +43,7 @@ export default function HomePage() {
             </div>
 
             <div className="hero__panel reveal delay-3">
-              <div className="scan-card glass">
-                <div className="scan-card__header">
-                  <div>
-                    <div className="eyebrow flex items-center gap-2">
-                      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                      Instant URL check
-                    </div>
-                    <h3 style={{ marginTop: "4px" }}>Assess risk before opening a site</h3>
-                  </div>
-                  <div className="chip chip--accent">Live scan</div>
-                </div>
-                <div className="scan-card__input">
-                  <input placeholder="e.g. questionable-site.com" disabled style={{ opacity: 0.6, cursor: 'not-allowed' }} />
-                  <button className="btn btn--glass" disabled style={{ opacity: 0.6, cursor: 'not-allowed' }}>Check</button>
-                </div>
-                <div className="scan-card__result" style={{ marginTop: "24px", padding: "12px", background: "rgba(255, 209, 102, 0.08)", borderRadius: "12px", border: "1px solid rgba(255, 209, 102, 0.2)"}}>
-                  <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="var(--warning)" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-                  <div>
-                    <div className="scan-card__label" style={{ color: "var(--warning)", fontWeight: 600 }}>Action Required</div>
-                    <Link href="/login" className="scan-card__url" style={{ textDecoration: 'underline', color: 'var(--text)', fontSize: '13px' }}>
-                      Sign in to unlock interactive scans
-                    </Link>
-                  </div>
-                </div>
-              </div>
+              <InstantUrlCheck />
 
               <div className="glass panel-note">
                 <div className="eyebrow flex items-center gap-2">

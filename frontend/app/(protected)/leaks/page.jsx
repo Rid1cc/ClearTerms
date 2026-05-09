@@ -6,30 +6,30 @@ import { apiRequest } from "../../lib/api";
 import { getAccessToken } from "../../lib/auth";
 
 const CATEGORY_LABELS = {
-  email: "E-mail",
-  password: "Hasło",
-  phone: "Telefon",
-  full_name: "Imię i nazwisko",
-  address: "Adres",
-  date_of_birth: "Data urodzenia",
-  national_id: "Numer identyfikacyjny",
-  credit_card: "Karta płatnicza",
-  bank_account: "Konto bankowe",
-  gps_location: "Lokalizacja GPS",
-  ip_address: "Adres IP",
-  device_id: "Identyfikator urządzenia",
-  biometric: "Dane biometryczne",
-  photo: "Zdjęcie",
-  browsing_history: "Historia przeglądania",
-  contacts: "Kontakty",
-  other: "Inne",
+  email: "Email",
+  password: "Password",
+  phone: "Phone",
+  full_name: "Full name",
+  address: "Address",
+  date_of_birth: "Date of birth",
+  national_id: "National ID",
+  credit_card: "Credit card",
+  bank_account: "Bank account",
+  gps_location: "GPS location",
+  ip_address: "IP address",
+  device_id: "Device ID",
+  biometric: "Biometric data",
+  photo: "Photo",
+  browsing_history: "Browsing history",
+  contacts: "Contacts",
+  other: "Other",
 };
 
 const SEVERITY_LABELS = {
-  low: "Niskie",
-  medium: "Średnie",
-  high: "Wysokie",
-  critical: "Krytyczne",
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+  critical: "Critical",
 };
 
 function formatCategories(cats) {
@@ -54,7 +54,7 @@ export default function LeaksPage() {
   useEffect(() => {
     const token = getAccessToken();
     if (!token) {
-      setError("Zaloguj się, aby zobaczyć dane.");
+      setError("Sign in to view this data.");
       setLoading(false);
       return;
     }
@@ -65,7 +65,7 @@ export default function LeaksPage() {
         setLeakAlerts(data?.leak_alerts || []);
         setError("");
       })
-      .catch((err) => setError(err.message || "Nie udało się wczytać danych."))
+      .catch((err) => setError(err.message || "Failed to load data."))
       .finally(() => setLoading(false));
   }, []);
 
@@ -73,25 +73,25 @@ export default function LeaksPage() {
     <div className="page">
       <section className="section">
         <div className="container">
-          <Topbar ctaLabel="Zaloguj" ctaHref="/login" />
+          <Topbar ctaLabel="Sign in" ctaHref="/login" />
           <div className="section__header reveal">
-            <div className="eyebrow">Wycieki i telemetria</div>
-            <h2>Co wysłałeś na strony</h2>
+            <div className="eyebrow">Leaks & telemetry</div>
+            <h2>What you sent to which sites</h2>
             <p>
-              Rejestrujemy tylko <strong>kategorie</strong> pól formularzy (np. e-mail, hasło), nigdy treść wpisów.
-              Dane pochodzą z rozszerzenia ClearTerms po wysłaniu formularza oraz z bazy skanów.
+              We only record <strong>field categories</strong> (e.g. email, password) — never the actual values.
+              Data comes from the ClearTerms extension on form submit and from the scan database.
             </p>
           </div>
 
           <div className="section-grid">
             <div className="glass card" style={{ gridColumn: "1 / -1" }}>
               <div className="card__header">
-                <h3>Alerty ryzyka</h3>
-                <span className="chip chip--accent">Phishing / podejrzane</span>
+                <h3>Risk alerts</h3>
+                <span className="chip chip--accent">Phishing / suspicious</span>
               </div>
               <div className="card__body">
                 {loading ? (
-                  <p className="muted">Wczytywanie…</p>
+                  <p className="muted">Loading…</p>
                 ) : leakAlerts.length ? (
                   <ul className="card__list" style={{ listStyle: "none", padding: 0, display: "grid", gap: "12px" }}>
                     {leakAlerts.map((a) => (
@@ -112,7 +112,7 @@ export default function LeaksPage() {
                         </div>
                         <p style={{ margin: "8px 0 0", fontSize: "14px", color: "var(--muted)" }}>{a.message}</p>
                         <p style={{ margin: "8px 0 0", fontSize: "13px" }}>
-                          <span className="muted">Kategorie: </span>
+                          <span className="muted">Categories: </span>
                           {formatCategories(a.data_categories)}
                         </p>
                         <p style={{ margin: "6px 0 0", fontSize: "12px", color: "var(--muted)" }}>
@@ -122,19 +122,19 @@ export default function LeaksPage() {
                     ))}
                   </ul>
                 ) : (
-                  <p className="muted">Brak alertów — nie wykryto przesłania danych na strony ocenione jako phishing lub podejrzane.</p>
+                  <p className="muted">No alerts — no submissions detected on phishing or suspicious sites.</p>
                 )}
               </div>
             </div>
 
             <div className="glass card" style={{ gridColumn: "1 / -1" }}>
               <div className="card__header">
-                <h3>Historia przesłanych kategorii</h3>
-                <span className="chip">Formularze</span>
+                <h3>Submitted categories — history</h3>
+                <span className="chip">Forms</span>
               </div>
               <div className="card__body">
                 {loading ? (
-                  <p className="muted">Wczytywanie…</p>
+                  <p className="muted">Loading…</p>
                 ) : error ? (
                   <p style={{ color: "var(--danger)" }}>{error}</p>
                 ) : submissions.length ? (
@@ -142,10 +142,10 @@ export default function LeaksPage() {
                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "14px" }}>
                       <thead>
                         <tr style={{ textAlign: "left", borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
-                          <th style={{ padding: "10px 8px" }}>Kiedy</th>
-                          <th style={{ padding: "10px 8px" }}>Domena</th>
-                          <th style={{ padding: "10px 8px" }}>Kategorie danych</th>
-                          <th style={{ padding: "10px 8px" }}>Werdykt strony</th>
+                          <th style={{ padding: "10px 8px" }}>When</th>
+                          <th style={{ padding: "10px 8px" }}>Domain</th>
+                          <th style={{ padding: "10px 8px" }}>Data categories</th>
+                          <th style={{ padding: "10px 8px" }}>Site verdict</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -164,7 +164,7 @@ export default function LeaksPage() {
                                   {s.verdict.verdict} ({s.verdict.score})
                                 </span>
                               ) : (
-                                <span className="muted">Brak skanu</span>
+                                <span className="muted">No scan</span>
                               )}
                             </td>
                           </tr>
@@ -174,7 +174,7 @@ export default function LeaksPage() {
                   </div>
                 ) : (
                   <p className="muted">
-                    Brak wpisów. Zainstaluj rozszerzenie, zaloguj się w nim i wyślij formularz na stronie — wtedy pojawi się wpis z kategoriami pól.
+                    No entries yet. Install the extension, sign in to it, and submit a form on a site — then a categorised entry will appear here.
                   </p>
                 )}
               </div>

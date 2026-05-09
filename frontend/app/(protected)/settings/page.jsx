@@ -7,29 +7,29 @@ import { apiRequest } from "../../lib/api";
 import { clearTokens, getAccessToken } from "../../lib/auth";
 
 const LANGUAGES = [
-  { value: "pl", label: "Polski" },
   { value: "en", label: "English" },
+  { value: "pl", label: "Polski" },
   { value: "de", label: "Deutsch" },
   { value: "fr", label: "Français" },
 ];
 
 const THEMES = [
   { value: "auto", label: "Auto (system)" },
-  { value: "dark", label: "Ciemny" },
-  { value: "light", label: "Jasny" },
+  { value: "dark", label: "Dark" },
+  { value: "light", label: "Light" },
 ];
 
 const SCAN_LEVELS = [
-  { value: "minimal", label: "Minimalny", hint: "Tylko phishing" },
-  { value: "balanced", label: "Zbalansowany", hint: "Phishing + podejrzane (zalecane)" },
-  { value: "strict", label: "Surowy", hint: "Wszystko poniżej 80 pkt" },
+  { value: "minimal", label: "Minimal", hint: "Phishing only" },
+  { value: "balanced", label: "Balanced", hint: "Phishing + suspicious (recommended)" },
+  { value: "strict", label: "Strict", hint: "Anything below 80 points" },
 ];
 
 const DEFAULT_PREFS = {
   notifications: true,
   email_alerts: true,
   weekly_digest: false,
-  language: "pl",
+  language: "en",
   theme: "auto",
   scan_level: "balanced",
   block_phishing: true,
@@ -120,7 +120,7 @@ export default function SettingsPage() {
         setDisplayName(data?.profile?.display_name || "");
         setPrefs({ ...DEFAULT_PREFS, ...(data?.profile?.preferences || {}) });
       })
-      .catch((err) => flash("error", err.message || "Nie udało się pobrać profilu."))
+      .catch((err) => flash("error", err.message || "Failed to load profile."))
       .finally(() => setLoading(false));
   }, [router]);
 
@@ -136,9 +136,9 @@ export default function SettingsPage() {
         body: { display_name: displayName.trim() || me?.user?.email?.split("@")[0] || "User" },
       });
       setMe((prev) => ({ ...(prev || {}), profile: updated }));
-      flash("success", "Profil zapisany.");
+      flash("success", "Profile saved.");
     } catch (err) {
-      flash("error", err.message || "Nie udało się zapisać profilu.");
+      flash("error", err.message || "Failed to save profile.");
     } finally {
       setSavingProfile(false);
     }
@@ -158,7 +158,7 @@ export default function SettingsPage() {
       });
       setMe((prev) => ({ ...(prev || {}), profile: updated }));
     } catch (err) {
-      flash("error", err.message || "Nie udało się zapisać preferencji.");
+      flash("error", err.message || "Failed to save preferences.");
     } finally {
       setSavingPrefs(false);
     }
@@ -173,9 +173,9 @@ export default function SettingsPage() {
         method: "POST",
         body: { email },
       });
-      flash("success", `Wysłano link resetu na ${email}.`);
+      flash("success", `Reset link sent to ${email}.`);
     } catch (err) {
-      flash("error", err.message || "Nie udało się wysłać linku.");
+      flash("error", err.message || "Failed to send reset link.");
     } finally {
       setResetSending(false);
     }
@@ -201,7 +201,7 @@ export default function SettingsPage() {
     <div className="page">
       <section className="section" style={{ paddingTop: 64 }}>
         <div className="container">
-          <Topbar ctaLabel="Zaloguj" ctaHref="/login" />
+          <Topbar ctaLabel="Sign in" ctaHref="/login" />
 
           <div className="dashboard__hero glass reveal">
             <div
@@ -210,10 +210,10 @@ export default function SettingsPage() {
               style={{ background: "radial-gradient(circle at 80% 20%, rgba(103,183,255,0.25), transparent 60%)" }}
             />
             <div className="dashboard__hero-content">
-              <div className="eyebrow">Ustawienia</div>
-              <h2 style={{ margin: "0 0 6px" }}>Konto i preferencje</h2>
+              <div className="eyebrow">Settings</div>
+              <h2 style={{ margin: "0 0 6px" }}>Account & preferences</h2>
               <p className="muted" style={{ margin: 0 }}>
-                Zarządzaj profilem, powiadomieniami, polityką skanowania i bezpieczeństwem.
+                Manage your profile, notifications, scanning policy, and security.
               </p>
             </div>
             <div className="dashboard__hero-aside">
@@ -230,8 +230,8 @@ export default function SettingsPage() {
           <div className="settings__grid">
             {/* Profile — full-width row above the masonry */}
             <SectionCard
-              title="Profil"
-              chip="Konto"
+              title="Profile"
+              chip="Account"
               accent="rgba(110,247,199,0.18)"
               fullWidth
               icon="◐"
@@ -243,14 +243,14 @@ export default function SettingsPage() {
                     className="btn btn--primary"
                     disabled={savingProfile || loading}
                   >
-                    {savingProfile ? "Zapisuję…" : "Zapisz profil"}
+                    {savingProfile ? "Saving…" : "Save profile"}
                   </button>
                 </div>
               }
             >
               <form id="settings-profile" onSubmit={saveProfile} className="form" style={{ marginTop: 4 }}>
                 <div className="form-field">
-                  <label htmlFor="email">E-mail</label>
+                  <label htmlFor="email">Email</label>
                   <input
                     id="email"
                     className="input"
@@ -258,49 +258,48 @@ export default function SettingsPage() {
                     disabled
                     readOnly
                   />
-                  <span className="settings__hint">E-mail jest powiązany z kontem auth — zmiana wymaga supportu.</span>
+                  <span className="settings__hint">Tied to your auth account — contact support to change.</span>
                 </div>
                 <div className="form-field">
-                  <label htmlFor="display_name">Nazwa wyświetlana</label>
+                  <label htmlFor="display_name">Display name</label>
                   <input
                     id="display_name"
                     className="input"
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
-                    placeholder="np. Karol R."
+                    placeholder="e.g. Karol R."
                     maxLength={100}
                     disabled={loading}
                   />
                 </div>
                 <div className="form-field">
-                  <label>ID użytkownika</label>
+                  <label>User ID</label>
                   <input className="input" value={me?.user?.id || ""} disabled readOnly />
                 </div>
               </form>
             </SectionCard>
-
           </div>
 
           <div className="settings__masonry">
             {/* Preferences: notifications */}
-            <SectionCard title="Powiadomienia" chip="Alerty" accent="rgba(103,183,255,0.18)" icon="◉">
+            <SectionCard title="Notifications" chip="Alerts" accent="rgba(103,183,255,0.18)" icon="◉">
               <ToggleRow
-                label="Powiadomienia w aplikacji"
-                hint="Pokazuj alerty bezpieczeństwa w panelu i w wtyczce."
+                label="In-app notifications"
+                hint="Show security alerts in the dashboard and the extension."
                 checked={!!prefs.notifications}
                 onChange={(v) => savePrefs({ notifications: v })}
                 disabled={loading || savingPrefs}
               />
               <ToggleRow
-                label="Alerty mailowe"
-                hint="Wysyłaj e-mail przy wykryciu phishingu lub krytycznego wycieku."
+                label="Email alerts"
+                hint="Send email when phishing or a critical leak is detected."
                 checked={!!prefs.email_alerts}
                 onChange={(v) => savePrefs({ email_alerts: v })}
                 disabled={loading || savingPrefs}
               />
               <ToggleRow
-                label="Tygodniowe podsumowanie"
-                hint="Co poniedziałek zbiorczy raport ze skanów."
+                label="Weekly digest"
+                hint="Every Monday — a summary of your scans."
                 checked={!!prefs.weekly_digest}
                 onChange={(v) => savePrefs({ weekly_digest: v })}
                 disabled={loading || savingPrefs}
@@ -308,9 +307,9 @@ export default function SettingsPage() {
             </SectionCard>
 
             {/* Preferences: scanning */}
-            <SectionCard title="Polityka skanowania" chip="Wtyczka" accent="rgba(255,209,102,0.18)" icon="⚐">
+            <SectionCard title="Scanning policy" chip="Extension" accent="rgba(255,209,102,0.18)" icon="⚐">
               <div className="form-field" style={{ marginBottom: 14 }}>
-                <label>Poziom czujności</label>
+                <label>Vigilance level</label>
                 <div className="settings__segments" role="radiogroup">
                   {SCAN_LEVELS.map((s) => (
                     <button
@@ -329,15 +328,15 @@ export default function SettingsPage() {
                 </div>
               </div>
               <ToggleRow
-                label="Automatyczne blokowanie phishingu"
-                hint="Wtyczka przerwie ładowanie strony, jeśli werdykt to phishing."
+                label="Auto-block phishing"
+                hint="Extension stops loading the page if the verdict is phishing."
                 checked={!!prefs.block_phishing}
                 onChange={(v) => savePrefs({ block_phishing: v })}
                 disabled={loading || savingPrefs}
               />
               <ToggleRow
-                label="Anonimowa telemetria"
-                hint="Pomóż ulepszać heurystykę — wysyłaj zanonimizowane statystyki."
+                label="Anonymous telemetry"
+                hint="Help improve heuristics — share anonymised statistics."
                 checked={!!prefs.share_telemetry}
                 onChange={(v) => savePrefs({ share_telemetry: v })}
                 disabled={loading || savingPrefs}
@@ -345,9 +344,9 @@ export default function SettingsPage() {
             </SectionCard>
 
             {/* Preferences: appearance */}
-            <SectionCard title="Wygląd i język" chip="UI" accent="rgba(255,123,123,0.16)" icon="◈">
+            <SectionCard title="Appearance & language" chip="UI" accent="rgba(255,123,123,0.16)" icon="◈">
               <div className="form-field">
-                <label htmlFor="lang">Język interfejsu</label>
+                <label htmlFor="lang">Interface language</label>
                 <select
                   id="lang"
                   className="input"
@@ -363,7 +362,7 @@ export default function SettingsPage() {
                 </select>
               </div>
               <div className="form-field" style={{ marginTop: 12 }}>
-                <label>Motyw</label>
+                <label>Theme</label>
                 <div className="settings__segments" role="radiogroup">
                   {THEMES.map((t) => (
                     <button
@@ -380,18 +379,18 @@ export default function SettingsPage() {
                   ))}
                 </div>
                 <span className="settings__hint">
-                  Motyw zapisuje się do preferencji konta — zastosowanie wkrótce.
+                  Theme is saved to your account preferences — applied UI coming soon.
                 </span>
               </div>
             </SectionCard>
 
             {/* Security */}
-            <SectionCard title="Bezpieczeństwo" chip="Sesja" accent="rgba(255,123,123,0.18)" icon="◇">
+            <SectionCard title="Security" chip="Session" accent="rgba(255,123,123,0.18)" icon="◇">
               <div className="settings__row">
                 <div>
-                  <div className="settings__row-title">Zmień hasło</div>
+                  <div className="settings__row-title">Change password</div>
                   <div className="settings__row-hint">
-                    Wyślemy link resetujący na {me?.user?.email || "Twój e-mail"}.
+                    We&apos;ll send a reset link to {me?.user?.email || "your email"}.
                   </div>
                 </div>
                 <button
@@ -400,14 +399,14 @@ export default function SettingsPage() {
                   onClick={sendPasswordReset}
                   disabled={resetSending || loading || !me?.user?.email}
                 >
-                  {resetSending ? "Wysyłam…" : "Wyślij link"}
+                  {resetSending ? "Sending…" : "Send link"}
                 </button>
               </div>
               <div className="settings__row">
                 <div>
-                  <div className="settings__row-title">Wyloguj wszędzie</div>
+                  <div className="settings__row-title">Sign out everywhere</div>
                   <div className="settings__row-hint">
-                    Unieważnia tę sesję na backendzie i czyści tokeny lokalnie.
+                    Invalidates this session on the backend and clears local tokens.
                   </div>
                 </div>
                 <button
@@ -416,20 +415,20 @@ export default function SettingsPage() {
                   onClick={signOut}
                   disabled={signingOut}
                 >
-                  {signingOut ? "Wylogowuję…" : "Wyloguj"}
+                  {signingOut ? "Signing out…" : "Sign out"}
                 </button>
               </div>
             </SectionCard>
 
             {/* About */}
-            <SectionCard title="O aplikacji" chip="Info" accent="rgba(110,247,199,0.16)" icon="◆">
+            <SectionCard title="About" chip="Info" accent="rgba(110,247,199,0.16)" icon="◆">
               <ul className="settings__meta">
                 <li>
-                  <span>Wersja</span>
+                  <span>Version</span>
                   <strong>0.1.0</strong>
                 </li>
                 <li>
-                  <span>Profil utworzony</span>
+                  <span>Profile created</span>
                   <strong>
                     {me?.profile?.created_at
                       ? new Date(me.profile.created_at).toLocaleDateString()
@@ -437,7 +436,7 @@ export default function SettingsPage() {
                   </strong>
                 </li>
                 <li>
-                  <span>Ostatnia aktualizacja</span>
+                  <span>Last update</span>
                   <strong>
                     {me?.profile?.updated_at
                       ? new Date(me.profile.updated_at).toLocaleString()
@@ -445,9 +444,9 @@ export default function SettingsPage() {
                   </strong>
                 </li>
                 <li>
-                  <span>Status preferencji</span>
+                  <span>Preferences status</span>
                   <strong style={{ color: savingPrefs ? "var(--warning)" : "var(--accent)" }}>
-                    {savingPrefs ? "Zapisuję…" : "Zsynchronizowane"}
+                    {savingPrefs ? "Saving…" : "Synced"}
                   </strong>
                 </li>
               </ul>
