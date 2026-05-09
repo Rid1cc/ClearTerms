@@ -2,20 +2,23 @@
   "manifest_version": 3,
   "name": "Privacy Policy Jina Gemini Analyzer",
   "version": "1.0",
-  "description": "Wysyła odwiedzane strony do backendu ClearTerms i pokazuje ocenę prywatności.",
+  "description": "Finds a privacy policy, fetches it through Jina, and rates it with Gemini.",
   "permissions": [
     "activeTab",
     "tabs",
     "storage",
+    "downloads",
     "scripting"
   ],
   "host_permissions": [
     "<all_urls>",
-    "http://localhost:3001/*"
+    "http://localhost:3001/*",
+    "https://r.jina.ai/*",
+    "https://generativelanguage.googleapis.com/*"
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "ClearTerms"
+    "default_title": "Rate the privacy policy"
   },
   "background": {
     "service_worker": "background.js"

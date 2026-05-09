@@ -1,19 +1,19 @@
+const scanBtn = document.getElementById("scanBtn");
+const statusDiv = document.getElementById("status");
 const loginForm = document.getElementById("loginForm");
+const loginBtn = document.getElementById("loginBtn");
 const emailInput = document.getElementById("email");
 const passwordInput = document.getElementById("password");
-const loginBtn = document.getElementById("loginBtn");
 const scanPanel = document.getElementById("scanPanel");
 const accountDiv = document.getElementById("account");
-const scanBtn = document.getElementById("scanBtn");
 const logoutBtn = document.getElementById("logoutBtn");
-const statusDiv = document.getElementById("status");
 
-loginForm.addEventListener("submit", async (event) => {
+loginForm.addEventListener("submit", async event => {
   event.preventDefault();
   loginBtn.disabled = true;
 
   try {
-    setStatus("Loguję...");
+    statusDiv.textContent = "Loggin in...";
 
     const response = await chrome.runtime.sendMessage({
       action: "login",
@@ -24,16 +24,16 @@ loginForm.addEventListener("submit", async (event) => {
     });
 
     if (!response || !response.success) {
-      setStatus(response?.error || "Nie udało się zalogować.");
+      statusDiv.textContent = response?.error || "Failed to log in.";
       return;
     }
 
     passwordInput.value = "";
     await refreshAuthState();
-    setStatus("Zalogowano. Nowe strony będą sprawdzane automatycznie.");
+    statusDiv.textContent = "Successfull logged in.";
   } catch (error) {
     console.error(error);
-    setStatus("Błąd: " + error.message);
+    statusDiv.textContent = "Error: " + error.message;
   } finally {
     loginBtn.disabled = false;
   }
@@ -43,7 +43,7 @@ scanBtn.addEventListener("click", async () => {
   scanBtn.disabled = true;
 
   try {
-    setStatus("Pobieram dane aktywnej strony...");
+    statusDiv.textContent = "Searching for a privacy policy.";
 
     const [tab] = await chrome.tabs.query({
       active: true,
@@ -51,31 +51,64 @@ scanBtn.addEventListener("click", async () => {
     });
 
     if (!tab || !tab.id) {
-      setStatus("Nie udało się odczytać aktywnej karty.");
+      statusDiv.textContent = "Unable to read the active tab.";
       return;
     }
 
-    if (!isScannableUrl(tab.url)) {
-      setStatus("Na tej stronie rozszerzenie nie może działać.");
+    if (
+      tab.url.startsWith("chrome://") ||
+      tab.url.startsWith("edge://") ||
+      tab.url.startsWith("brave://") ||
+      tab.url.startsWith("about:")
+    ) {
+      statusDiv.textContent = "This extension cannot run on this page. Open a regular website.";
       return;
     }
 
-    const pageData = await collectPageData(tab.id);
+    let found;
+
+    try {
+      found = await chrome.tabs.sendMessage(tab.id, {
+        action: "findPrivacyPolicy"
+      });
+    } catch (error) {
+      console.log("Content script was not active. Injecting content.js...");
+
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        files: ["content.js"]
+      });
+
+      found = await chrome.tabs.sendMessage(tab.id, {
+        action: "findPrivacyPolicy"
+      });
+    }
+
+    if (!found || !found.success) {
+      statusDiv.textContent = found?.error || "No privacy policy was found.";
+      return;
+    }
+
+    statusDiv.textContent = "Privacy policy found:\n" + found.privacyUrl + "\n\nChecking the backend and starting analysis...";
 
     const response = await chrome.runtime.sendMessage({
-      action: "startBackendScan",
-      data: pageData
+      action: "startAnalyzeJob",
+      data: {
+        sourcePage: found.sourcePage,
+        privacyUrl: found.privacyUrl
+      }
     });
 
     if (!response || !response.success) {
-      setStatus(response?.error || "Nie udało się uruchomić analizy.");
+      statusDiv.textContent = response?.error || "Analysis failed, try again in a few seconds.";
       return;
     }
 
-    setStatus(formatScanResult(response.result));
+    statusDiv.textContent =
+      "Analysis ongoing.\n";
   } catch (error) {
     console.error(error);
-    setStatus("Błąd: " + error.message);
+    statusDiv.textContent = "Error: " + error.message;
   } finally {
     scanBtn.disabled = false;
   }
@@ -90,110 +123,63 @@ logoutBtn.addEventListener("click", async () => {
     });
 
     if (!response || !response.success) {
-      setStatus(response?.error || "Nie udało się wylogować.");
+      statusDiv.textContent = response?.error || "Unable to log out.";
       return;
     }
 
     await refreshAuthState();
   } catch (error) {
     console.error(error);
-    setStatus("Błąd: " + error.message);
+    statusDiv.textContent = "Error: " + error.message;
   } finally {
     logoutBtn.disabled = false;
   }
 });
 
-async function collectPageData(tabId) {
-  try {
-    const response = await chrome.tabs.sendMessage(tabId, {
-      action: "collectPageData"
-    });
-
-    if (response && response.success) {
-      return {
-        url: response.url,
-        domContent: response.domContent
-      };
-    }
-  } catch (error) {
-    console.log("Content script nie był aktywny. Wstrzykuję content.js...");
-  }
-
-  await chrome.scripting.executeScript({
-    target: { tabId },
-    files: ["content.js"]
+async function refreshStatus() {
+  const [tab] = await chrome.tabs.query({
+    active: true,
+    currentWindow: true
   });
 
-  const injectedResponse = await chrome.tabs.sendMessage(tabId, {
-    action: "collectPageData"
-  });
+  const data = await chrome.storage.local.get([
+    "analyzeStatus",
+    "analyzeStatusPage"
+  ]);
 
-  if (!injectedResponse || !injectedResponse.success) {
-    throw new Error("Nie udało się zebrać danych strony.");
+  if (data.analyzeStatus && data.analyzeStatusPage === tab?.url) {
+    statusDiv.textContent = data.analyzeStatus;
   }
-
-  return {
-    url: injectedResponse.url,
-    domContent: injectedResponse.domContent
-  };
 }
 
 async function refreshAuthState() {
-  const [auth, latestScan] = await Promise.all([
-    chrome.runtime.sendMessage({ action: "getAuthState" }),
-    chrome.runtime.sendMessage({ action: "getLatestScan" })
-  ]);
+  const auth = await chrome.runtime.sendMessage({
+    action: "getAuthState"
+  });
 
   const loggedIn = Boolean(auth?.loggedIn);
 
   loginForm.classList.toggle("hidden", loggedIn);
   scanPanel.classList.toggle("hidden", !loggedIn);
-  accountDiv.textContent = loggedIn ? "Zalogowano jako " + auth.email : "";
-
-  if (latestScan?.status) {
-    setStatus(latestScan.status);
-  }
-}
-
-function setStatus(text) {
-  statusDiv.textContent = text;
-}
-
-function formatScanResult(result) {
-  const cacheText = result.cached ? "wynik z cache" : "nowa analiza";
-  const partialText = result.partial ? ", wynik częściowy" : "";
-  const summary = result.summary ? "\n\n" + result.summary : "";
-
-  return (
-    "Gotowe: " +
-    result.verdict +
-    " (" +
-    result.score +
-    "/100, " +
-    cacheText +
-    partialText +
-    ")" +
-    summary
-  );
-}
-
-function isScannableUrl(url) {
-  if (!url) return false;
-
-  try {
-    const parsed = new URL(url);
-    return parsed.protocol === "http:" || parsed.protocol === "https:";
-  } catch {
-    return false;
-  }
+  accountDiv.textContent = loggedIn ? "Signed in as " + auth.email : "";
 }
 
 refreshAuthState();
+refreshStatus();
 
 chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName !== "local") return;
 
+  if (
+    changes.accessToken ||
+    changes.refreshToken ||
+    changes.tokenExpiresAt ||
+    changes.userEmail
+  ) {
+    refreshAuthState();
+  }
+
   if (changes.analyzeStatus) {
-    setStatus(changes.analyzeStatus.newValue);
+    statusDiv.textContent = changes.analyzeStatus.newValue;
   }
 });

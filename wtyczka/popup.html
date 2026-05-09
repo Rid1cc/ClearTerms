@@ -1,109 +1,174 @@
 <!DOCTYPE html>
-<html lang="pl">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <title>ClearTerms</title>
   <style>
+    :root {
+      --bg-0: #07090f;
+      --bg-1: #0b0f1b;
+      --glass: rgba(255, 255, 255, 0.06);
+      --glass-border: rgba(255, 255, 255, 0.14);
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --accent: #6ef7c7;
+      --accent-2: #67b7ff;
+      --danger: #ff7b7b;
+      --font-sans: "Space Grotesk", "Segoe UI", sans-serif;
+      --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
     * {
       box-sizing: border-box;
     }
 
     body {
-      width: 340px;
+      width: 360px;
+      min-height: 220px;
       margin: 0;
-      padding: 14px;
-      color: #161616;
-      font-family: Arial, sans-serif;
-      background: #f7f7f4;
+      padding: 16px;
+      color: var(--text);
+      font-family: var(--font-sans);
+      background:
+        radial-gradient(circle at 20% -10%, rgba(103, 183, 255, 0.26), transparent 52%),
+        radial-gradient(circle at 88% 8%, rgba(110, 247, 199, 0.18), transparent 48%),
+        var(--bg-0);
     }
 
-    h1 {
-      margin: 0 0 12px;
-      font-size: 18px;
+    .shell {
+      padding: 16px;
+      border: 1px solid var(--glass-border);
+      border-radius: 18px;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04));
+      box-shadow: 0 24px 60px rgba(6, 12, 24, 0.55);
+      backdrop-filter: blur(18px) saturate(140%);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .brand__icon {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(110, 247, 199, 0.4);
+      border-radius: 12px;
+      background: rgba(110, 247, 199, 0.16);
+      color: var(--accent);
       font-weight: 700;
     }
 
-    label {
-      display: block;
-      margin: 8px 0 4px;
-      font-size: 12px;
+    .brand__name {
+      font-size: 16px;
       font-weight: 700;
     }
 
-    input {
-      width: 100%;
-      padding: 9px;
-      border: 1px solid #c9c9c2;
-      border-radius: 6px;
-      background: white;
-      font-size: 13px;
+    .panel {
+      display: grid;
+      gap: 12px;
     }
 
     button {
       width: 100%;
-      min-height: 38px;
-      margin-top: 10px;
-      padding: 10px;
+      min-height: 42px;
+      padding: 12px 14px;
       cursor: pointer;
-      border: none;
-      border-radius: 6px;
-      background: #1f2933;
-      color: white;
-      font-weight: 700;
-    }
-
-    button.secondary {
-      background: #deded6;
-      color: #1f2933;
+      border: 1px solid transparent;
+      border-radius: 12px;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      background: linear-gradient(135deg, rgba(110, 247, 199, 0.92), rgba(103, 183, 255, 0.92));
+      color: #041115;
     }
 
     button:disabled {
-      background: #8d928f;
+      opacity: 0.55;
       cursor: not-allowed;
     }
 
-    #account {
-      margin-bottom: 10px;
+    label {
+      display: block;
       font-size: 12px;
-      color: #555b57;
-      word-break: break-word;
+      font-weight: 500;
+      color: var(--muted);
     }
 
-    #status {
-      margin-top: 12px;
-      padding-top: 10px;
-      border-top: 1px solid #deded6;
-      font-size: 13px;
-      line-height: 1.35;
-      white-space: pre-wrap;
-      word-break: break-word;
+    input {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid var(--glass-border);
+      border-radius: 12px;
+      outline: none;
+      color: var(--text);
+      background: rgba(6, 12, 24, 0.45);
+      font-family: inherit;
+    }
+
+    input:focus {
+      border-color: rgba(110, 247, 199, 0.55);
+    }
+
+    .secondary {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: var(--glass-border);
+      color: var(--text);
     }
 
     .hidden {
       display: none;
     }
+
+    #account {
+      font-size: 12px;
+      color: var(--muted);
+      word-break: break-word;
+    }
+
+    #status {
+      margin-top: 12px;
+      padding: 12px;
+      border: 1px solid var(--glass-border);
+      border-radius: 12px;
+      background: rgba(6, 12, 24, 0.45);
+      color: var(--text);
+      font-size: 13px;
+      line-height: 1.35;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
   </style>
 </head>
 <body>
-  <h1>ClearTerms</h1>
+  <main class="shell">
+    <div class="brand">
+      <div class="brand__icon">C</div>
+      <div class="brand__name">ClearTerms</div>
+    </div>
 
-  <form id="loginForm">
-    <label for="email">Email</label>
-    <input id="email" type="email" autocomplete="email" required>
+    <form id="loginForm" class="panel">
+      <label for="email">Email</label>
+      <input id="email" type="email" autocomplete="email" required>
 
-    <label for="password">Hasło</label>
-    <input id="password" type="password" autocomplete="current-password" required>
+      <label for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password" required>
 
-    <button id="loginBtn" type="submit">Zaloguj</button>
-  </form>
+      <button id="loginBtn" type="submit">Log in</button>
+    </form>
 
-  <div id="scanPanel" class="hidden">
-    <div id="account"></div>
-    <button id="scanBtn" type="button">Sprawdź tę stronę teraz</button>
-    <button id="logoutBtn" class="secondary" type="button">Wyloguj</button>
-  </div>
+    <div id="scanPanel" class="panel hidden">
+      <div id="account"></div>
+      <button id="scanBtn">Rate the privacy policy</button>
+      <button id="logoutBtn" class="secondary">Log out</button>
+    </div>
 
-  <div id="status">Gotowe do działania.</div>
+    <div id="status">Ready to work!</div>
+  </main>
 
   <script src="popup.js"></script>
 </body>
