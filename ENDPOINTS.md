@@ -145,3 +145,252 @@ Aktualizuje `display_name` i/lub `preferences`.
 ```
 - **Response:** zaktualizowany rekord `user_profiles`
 - **Errors:** `400` validation, `500` db error
+
+---
+
+## Scan
+
+### `POST /api/scan`
+Pełna analiza strony — kluczowy endpoint. Odpowiada: "Co ta strona o mnie zbiera i czy mogę jej zaufać?"
+
+**Flow:**
+1. URL jest normalizowany (lowercase host, strip portu, strip UTM-ów, strip fragmentu) i hashowany SHA-256.
+2. Cache w `scanned_sites`:
+   - **`last_analyzed_at < SCAN_CACHE_TTL_HOURS` (domyślnie 24h):** zwracamy werdykt z bazy, BEZ wołania AI. `cached: true`.
+   - **starsze lub brak:** wołamy serwis AI (`AI_SERVICE_URL`), zapisujemy nowy werdykt + analizę polityki + audyt firmy, zwracamy świeży werdykt. `cached: false`.
+3. Każdy skan loguje wpis do `scan_history` (`triggered_refresh: true` jeśli ten skan zainicjował refresh).
+4. **Fallback:** jeśli AI niedostępne lub timeout (`AI_SCAN_TIMEOUT_MS`), zwracamy minimalny werdykt z `verdict: "unknown"` i `partial: true`. Wtyczka może wtedy pokazać "wynik niepewny".
+
+- **Auth:** required
+- **Used by:** wtyczka, dashboard
+- **Body:**
+```json
+{
+  "url": "https://example.com",
+  "dom_content": "<html>...</html>"
+}
+```
+`dom_content` jest opcjonalne — wtyczka może je dostarczyć aby AI nie musiało scrapować strony samo (limit 500 KB).
+
+- **Response `200`:**
+```json
+{
+  "url": "https://example.com",
+  "verdict": "suspicious",
+  "score": 42,
+  "summary": "Strona zbiera szeroki zakres danych osobowych...",
+  "data_collected": ["email", "phone", "gps_location"],
+  "red_flags": [
+    "Sprzedaż danych firmom trzecim bez wyraźnej zgody",
+    "Brak opcji usunięcia konta"
+  ],
+  "company": {
+    "name": "Example Corp",
+    "headquarters_country": "US",
+    "website": "https://example.com",
+    "description": "...",
+    "data_processing_countries": ["US", "IN", "PH"]
+  },
+  "company_audit": {
+    "known_breaches": 2,
+    "regulatory_fines": 1,
+    "incidents_timeline": [ { "date": "...", "title": "...", "severity": "high" } ],
+    "sources": [ "https://..." ],
+    "reliability_score": 38
+  },
+  "privacy_policy": {
+    "short_summary": "...",
+    "key_clauses": [ { "title": "...", "description": "...", "severity": "high" } ],
+    "sells_data_to_third_parties": true,
+    "transfers_outside_eea": true,
+    "allows_account_deletion": false,
+    "raw_policy_url": "https://example.com/privacy",
+    "language": "en"
+  },
+  "last_analyzed_at": "2026-05-09T12:00:00Z",
+  "cached": false
+}
+```
+
+Pola mogą być `null` jeśli AI nie zwróciło danych (np. strona bez wykrywalnej polityki prywatności, świeża domena bez audytu). `partial: true` jest dodawane gdy zadziałał fallback heurystyczny.
+
+- **Errors:** `400` validation / invalid URL, `401` brak/zły token, `500` błąd zapisu do bazy
+
+---
+
+## Groups
+
+Wszystkie endpointy w tej sekcji wymagają `Authorization: Bearer ...`. Role: `admin`, `member`, `child`. Twórca grupy automatycznie zostaje administratorem.
+
+### `POST /api/groups`
+Tworzy nową grupę. Wywołujący zostaje administratorem.
+- **Body:**
+```json
+{ "name": "Rodzina Kowalskich", "description": "Kontrola rodzicielska" }
+```
+- **Response `201`:** rekord grupy + `role: "admin"`
+- **Errors:** `400` validation, `500` db error
+
+---
+
+### `GET /api/groups`
+Lista grup, do których należy użytkownik.
+- **Response:**
+```json
+{
+  "groups": [
+    { "id": "uuid", "name": "...", "description": "...", "invite_code": "...",
+      "role": "admin", "joined_at": "...", "created_at": "...", "updated_at": "..." }
+  ]
+}
+```
+
+---
+
+### `GET /api/groups/:id`
+Szczegóły grupy. Tylko dla członków.
+- **Response:** rekord grupy + `role`
+- **Errors:** `404` jeśli nie jest członkiem
+
+---
+
+### `PATCH /api/groups/:id`
+Aktualizacja `name`/`description`. **Admin only.**
+- **Body:** `{ "name"?: "...", "description"?: "..." }`
+- **Errors:** `403` non-admin, `404` not found
+
+---
+
+### `DELETE /api/groups/:id`
+Usuwa grupę (cascade na członkostwa, zaproszenia, alerty). **Admin only.**
+- **Response:** `204`
+
+---
+
+### `GET /api/groups/:id/members`
+Lista członków grupy z profilami. Widoczne dla każdego członka.
+- **Response:**
+```json
+{
+  "members": [
+    { "user_id": "uuid", "role": "child", "joined_at": "...",
+      "profile": { "display_name": "...", "avatar_url": null } }
+  ]
+}
+```
+
+---
+
+### `PATCH /api/groups/:id/members/:userId`
+Zmiana roli członka. **Admin only.** Nie pozwala zdjąć roli admina ostatniemu administratorowi.
+- **Body:** `{ "role": "admin" | "member" | "child" }`
+- **Errors:** `400` last admin, `403` non-admin, `404` member not found
+
+---
+
+### `DELETE /api/groups/:id/members/:userId`
+Usuwa członka z grupy. Admin może usunąć każdego, użytkownik może usunąć siebie. Ostatni admin nie może opuścić grupy bez powołania innego.
+- **Response:** `204`
+- **Errors:** `400` last admin, `403` non-admin & non-self, `404` not found
+
+---
+
+### `POST /api/groups/:id/invite-code`
+Generuje (lub rotuje) wspólny kod zaproszenia grupy. **Admin only.**
+- **Response:** `{ "invite_code": "abc123..." }`
+
+---
+
+### `DELETE /api/groups/:id/invite-code`
+Wyłącza wspólny kod zaproszenia. **Admin only.**
+- **Response:** `204`
+
+---
+
+### `POST /api/groups/join`
+Dołączanie do grupy przez wspólny kod (rola: `member`).
+- **Body:** `{ "invite_code": "abc123..." }`
+- **Response `201`:** `{ "group_id": "uuid", "role": "member" }`
+- **Response `200`:** `{ "group_id": "uuid", "role": "...", "already_member": true }` — jeśli już był członkiem
+- **Errors:** `404` invalid code
+
+---
+
+### `POST /api/groups/:id/invitations`
+Tworzy zaproszenie email z indywidualnym tokenem. **Admin only.** Backend zwraca token; wysyłka emaila przez integrację z mailerem (frontend buduje link).
+- **Body:**
+```json
+{ "email": "ann@example.com", "role": "child" }
+```
+- **Response `201`:**
+```json
+{
+  "id": "uuid",
+  "group_id": "uuid",
+  "email": "ann@example.com",
+  "role": "child",
+  "token": "<long-url-safe-token>",
+  "status": "pending",
+  "expires_at": "...",
+  "created_at": "..."
+}
+```
+- **Errors:** `409` jeśli istnieje już pending invite na ten email w tej grupie
+
+---
+
+### `GET /api/groups/:id/invitations`
+Lista zaproszeń grupy (wszystkie statusy). **Admin only.**
+- **Response:** `{ "invitations": [ ... ] }` (bez tokenów — zwraca `id`, `email`, `role`, `status`, `expires_at`, `accepted_at`, `created_at`)
+
+---
+
+### `DELETE /api/groups/:id/invitations/:invitationId`
+Cofa pending zaproszenie (status → `revoked`). **Admin only.**
+- **Response:** `204`
+- **Errors:** `404` if not pending
+
+---
+
+### `POST /api/invitations/:token/accept`
+Akceptacja zaproszenia po tokenie. Email zalogowanego użytkownika musi pasować do emaila z zaproszenia.
+- **Auth:** required (zalogowany jako odbiorca zaproszenia)
+- **Response `201`:** `{ "group_id": "uuid", "role": "..." }`
+- **Response `200`:** `{ "group_id": "uuid", "role": "...", "already_member": true }`
+- **Errors:** `403` email mismatch, `410` expired/revoked/accepted, `404` invalid token
+
+---
+
+## Group activity (admin views)
+
+Administrator grupy widzi aktywność członków — rodzic historię skanów dziecka, lider zespołu — pracownika.
+
+### `GET /api/groups/:id/members/:userId/scan-history`
+Historia skanów członka grupy. **Admin only.**
+- **Query:** `?limit=50&offset=0` (limit max 200)
+- **Response:**
+```json
+{
+  "history": [
+    { "id": "uuid", "scanned_at": "...", "triggered_refresh": false,
+      "site": { "id": "uuid", "url": "...", "domain": "..." },
+      "verdict": { "verdict": "suspicious", "score": 42, "summary": "..." } }
+  ],
+  "limit": 50,
+  "offset": 0
+}
+```
+
+---
+
+### `GET /api/groups/:id/members/:userId/parental-alerts`
+Alerty kontroli rodzicielskiej dla konkretnego dziecka. **Admin only.**
+- **Response:**
+```json
+{
+  "alerts": [
+    { "id": "uuid", "site_url": "...", "event_type": "visit_blocked",
+      "details": { ... }, "occurred_at": "...", "acknowledged_at": null }
+  ]
+}
+```

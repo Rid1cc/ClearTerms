@@ -18,6 +18,8 @@ create extension if not exists "pgcrypto";
 -- ---------------------------------------------------------------------
 create type group_role as enum ('admin', 'member', 'child');
 
+create type invitation_status as enum ('pending', 'accepted', 'revoked', 'expired');
+
 create type verdict_type as enum ('safe', 'suspicious', 'phishing', 'unknown');
 
 create type data_category as enum (
@@ -106,6 +108,39 @@ create index idx_group_members_user on public.group_members(user_id);
 create index idx_group_members_role on public.group_members(group_id, role);
 
 comment on table public.group_members is 'Członkostwo w grupach z rolami';
+
+
+-- ---------------------------------------------------------------------
+-- ZAPROSZENIA DO GRUP (per-email, z tokenem)
+-- ---------------------------------------------------------------------
+-- Niezależne od groups.invite_code (który jest jednym wspólnym kodem grupy).
+-- Tutaj trzymamy zaproszenia kierowane do konkretnego adresu email,
+-- z indywidualnym tokenem, terminem ważności i przypisaną rolą.
+create table public.group_invitations (
+    id uuid primary key default uuid_generate_v4(),
+    group_id uuid not null references public.groups(id) on delete cascade,
+    email text not null,
+    role group_role not null default 'member',
+    token text not null unique,
+    invited_by uuid not null references auth.users(id) on delete cascade,
+    status invitation_status not null default 'pending',
+    expires_at timestamptz not null default (now() + interval '14 days'),
+    accepted_at timestamptz,
+    accepted_by uuid references auth.users(id) on delete set null,
+    created_at timestamptz not null default now()
+);
+
+create index idx_group_invitations_group on public.group_invitations(group_id);
+create index idx_group_invitations_email on public.group_invitations(lower(email));
+create index idx_group_invitations_token on public.group_invitations(token);
+create index idx_group_invitations_status on public.group_invitations(group_id, status);
+
+-- Jedno aktywne zaproszenie per (grupa, email)
+create unique index idx_group_invitations_unique_pending
+    on public.group_invitations(group_id, lower(email))
+    where status = 'pending';
+
+comment on table public.group_invitations is 'Zaproszenia do grup wysyłane na email z indywidualnym tokenem';
 
 
 -- =====================================================================
@@ -425,6 +460,7 @@ create trigger trg_company_audits_updated before update on public.company_audits
 alter table public.user_profiles enable row level security;
 alter table public.groups enable row level security;
 alter table public.group_members enable row level security;
+alter table public.group_invitations enable row level security;
 alter table public.companies enable row level security;
 alter table public.scanned_sites enable row level security;
 alter table public.site_verdicts enable row level security;
@@ -523,6 +559,20 @@ create policy "admins can remove members"
               and gm.role = 'admin'
         )
         or auth.uid() = user_id  -- użytkownik może sam wyjść z grupy
+    );
+
+
+-- ----- group_invitations -----
+-- Backend (service_role) zarządza większością operacji; tu tylko odczyt dla zalogowanych adminów grupy.
+create policy "group admins see invitations"
+    on public.group_invitations for select
+    using (
+        exists (
+            select 1 from public.group_members
+            where group_members.group_id = group_invitations.group_id
+              and group_members.user_id = auth.uid()
+              and group_members.role = 'admin'
+        )
     );
 
 

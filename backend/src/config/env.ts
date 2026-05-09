@@ -12,6 +12,15 @@ const envSchema = z.object({
     .string()
     .default('http://localhost:3000')
     .transform((s) => s.split(',').map((o) => o.trim())),
+
+  // Zewnętrzny serwis AI (analiza polityk prywatności + research firm).
+  // Jeśli puste — backend użyje fallbacku heurystycznego (verdict=unknown, partial=true).
+  AI_SERVICE_URL: z.string().url().optional(),
+  AI_SERVICE_API_KEY: z.string().optional(),
+  AI_SCAN_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120000).default(30000),
+
+  // TTL cache strony — werdykt świeższy niż TTL zwracamy bez ponownej analizy.
+  SCAN_CACHE_TTL_HOURS: z.coerce.number().int().min(1).max(720).default(24),
 })
 
 const parsed = envSchema.safeParse(process.env)
