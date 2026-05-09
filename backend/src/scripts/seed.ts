@@ -72,6 +72,7 @@ async function main() {
   await supabase.from('scanned_sites').delete().neq('id', '00000000-0000-0000-0000-000000000000');
   await supabase.from('companies').delete().neq('id', '00000000-0000-0000-0000-000000000000');
   await supabase.from('groups').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+  await supabase.from('phishing_blacklist').delete().neq('id', '00000000-0000-0000-0000-000000000000');
 
   // ---------- 2. USERS (16 total) ----------
   console.log('👤 Creating users (this is the slow part)…');
@@ -561,9 +562,56 @@ async function main() {
   await bulkInsert('leak_alerts', leakInserts);
   console.log(`   • leak_alerts: ${leakInserts.length} rows`);
 
+  // ---------- 10. PHISHING BLACKLIST ----------
+  console.log('🛑 Seeding phishing_blacklist…');
+
+  type BlacklistRow = {
+    url: string;
+    domain: string;
+    source: 'google_safe_browsing' | 'phishtank' | 'internal_ai' | 'user_report';
+    reason: string;
+    expires_in_days?: number;
+  };
+
+  const blacklistEntries: BlacklistRow[] = [
+    // The big one the user explicitly asked for.
+    { url: 'https://onet.pl', domain: 'onet.pl', source: 'user_report', reason: 'Reported by SecOps — flagged for demo.' },
+
+    // Plausible filler from various "sources".
+    { url: 'https://company-login-update-urgent.com', domain: 'company-login-update-urgent.com', source: 'google_safe_browsing', reason: 'Credential harvesting campaign targeting AD logins.' },
+    { url: 'https://verify-bank-account.example', domain: 'verify-bank-account.example', source: 'phishtank', reason: 'Bank impersonation kit observed in the wild.' },
+    { url: 'https://prize-winner-notice.example', domain: 'prize-winner-notice.example', source: 'phishtank', reason: 'Lottery scam landing page.' },
+    { url: 'https://acme-payroll-login.example', domain: 'acme-payroll-login.example', source: 'internal_ai', reason: 'AI: lookalike of internal payroll vendor with high typo-squatting score.' },
+    { url: 'https://o365-reauth.example', domain: 'o365-reauth.example', source: 'google_safe_browsing', reason: 'O365 MFA token harvester.', expires_in_days: 90 },
+    { url: 'https://tax-refund-portal.example', domain: 'tax-refund-portal.example', source: 'phishtank', reason: 'Government impersonation, seasonal.' },
+    { url: 'https://courier-redelivery.example', domain: 'courier-redelivery.example', source: 'phishtank', reason: 'SMS-driven parcel redelivery scam.' },
+    { url: 'https://hr-benefits-update.example', domain: 'hr-benefits-update.example', source: 'internal_ai', reason: 'AI: targets new-hire benefits enrolment workflows.' },
+    { url: 'https://docusign-secure.example', domain: 'docusign-secure.example', source: 'google_safe_browsing', reason: 'DocuSign brand impersonation.' },
+    { url: 'https://invoice-overdue.example', domain: 'invoice-overdue.example', source: 'user_report', reason: 'Invoice fraud — reported by finance@company.com.' },
+    { url: 'https://it-support-helpdesk.example', domain: 'it-support-helpdesk.example', source: 'internal_ai', reason: 'Vishing/callback hybrid landing page.' },
+    { url: 'https://shared-doc-review.example', domain: 'shared-doc-review.example', source: 'google_safe_browsing', reason: 'Google Drive impersonation, captures Workspace credentials.' },
+    { url: 'https://crypto-airdrop.example', domain: 'crypto-airdrop.example', source: 'internal_ai', reason: 'Wallet seed-phrase harvester.', expires_in_days: 30 },
+    { url: 'http://free-movies-hd-now.ru', domain: 'free-movies-hd-now.ru', source: 'phishtank', reason: 'Drive-by malware host.' },
+    { url: 'https://login-verify-account.example', domain: 'login-verify-account.example', source: 'user_report', reason: 'Reported by sales@company.com after suspicious email.' },
+  ];
+
+  const blacklistRows = blacklistEntries.map((b) => ({
+    url: b.url,
+    domain: b.domain,
+    url_hash: hashUrl(b.url),
+    source: b.source,
+    reason: b.reason,
+    is_active: true,
+    expires_at: b.expires_in_days
+      ? new Date(Date.now() + b.expires_in_days * 86400000).toISOString()
+      : null,
+  }));
+  await bulkInsert('phishing_blacklist', blacklistRows);
+  console.log(`   • phishing_blacklist: ${blacklistRows.length} entries (incl. onet.pl)`);
+
   console.log('\n🎉 ALL DONE! The corporate database is mega-seeded.');
   console.log('Login: ceo@company.com / Password123!  (or any of the 16 *@company.com emails)');
-  console.log(`Totals: users=${userIds.length}, groups=${groupIds.length}, sites=${sites.length}, scans=${scanRows.length}, submissions=${allLogRows.length}, leaks=${leakInserts.length}, alerts=${alertRows.length}`);
+  console.log(`Totals: users=${userIds.length}, groups=${groupIds.length}, sites=${sites.length}, scans=${scanRows.length}, submissions=${allLogRows.length}, leaks=${leakInserts.length}, alerts=${alertRows.length}, blacklist=${blacklistRows.length}`);
 }
 
 main().catch(console.error);

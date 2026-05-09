@@ -293,7 +293,6 @@ export default function InstantUrlCheck() {
 
       {!scanning && !result && (
         <div className="instant-check__samples">
-          <span className="muted" style={{ fontSize: 11 }}>Try:</span>
           {SAMPLES.map((s) => (
             <button
               key={s}
