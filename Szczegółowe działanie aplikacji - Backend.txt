@@ -1,0 +1,169 @@
+﻿Specyfikacja aplikacji — Backend
+1. Opis ogólny
+Aplikacja webowa + wtyczka przeglądarkowa do analizy bezpieczeństwa i wiarygodności stron internetowych. Użytkownik dostaje werdykt czy strona jest "legitna", co o nim wie, czy nie jest phishingiem, oraz może działać w ramach grup (np. rodzina z kontrolą rodzicielską, zespół firmowy).
+Sercem produktu jest analiza AI — model językowy czyta politykę prywatności i EULA strony, wyszukuje w internecie historyczne informacje o firmie, i zwraca użytkownikowi zrozumiały skrót: co strona o nim zbiera, jak rzetelna jest firma, czy są historyczne incydenty.
+Backend obsługuje:
+* wtyczkę przeglądarkową (analiza stron w czasie rzeczywistym, blokada phishingu),
+* aplikację webową w Next.js (dashboard, grupy, kontrola rodzicielska),
+* zewnętrzny serwis AI (analiza polityk prywatności, EULA, research firmy).
+2. Stack technologiczny
+* Runtime: Node.js
+* Framework: Next.js (API routes)
+* Baza danych: Supabase (PostgreSQL)
+* Auth: Supabase Auth
+* Walidacja: Zod
+* Język: TypeScript
+3. Model danych
+Główne encje do zaprojektowania w Supabase:
+* users — rozszerzenie auth.users z Supabase (profil, ustawienia)
+* groups — grupy użytkowników (rodzina, zespół)
+* group_members — relacja user ↔ group z rolami (admin, member, child)
+* scanned_sites — strony już przeanalizowane (URL, hash, last_analyzed_at)
+* site_verdicts — werdykty AI (ryzyko, score, czerwone flagi, podsumowanie, lokalizacja siedziby firmy, kraje przetwarzania danych)
+* privacy_policy_analyses — szczegółowe wyniki analizy polityki prywatności / EULA (skrócony opis, lista zbieranych danych, kluczowe klauzule)
+* company_audits — audyt rzetelności firmy (incydenty, wycieki historyczne, oś czasu, źródła)
+* scan_history — historia skanów per użytkownik (kto, kiedy, jaką stronę)
+* submitted_data_log — co użytkownik przekazał konkretnej stronie (do detekcji wycieków, patrz pkt 4.7)
+* phishing_reports — blacklista phishingowa
+* parental_alerts — powiadomienia dla administratora kontroli rodzicielskiej
+Row Level Security (RLS) włączone na wszystkich tabelach z danymi użytkowników. Admin grupy widzi tylko członków swojej grupy, rodzic tylko swoich podopiecznych.
+4. Funkcjonalności i endpointy
+4.1. Auth i konta użytkowników
+* Rejestracja, logowanie, reset hasła (Supabase Auth)
+* Token sesyjny działa zarówno w aplikacji webowej, jak i we wtyczce
+* Profil użytkownika: email, nazwa, ustawienia preferencji bezpieczeństwa
+4.2. System grup
+* Tworzenie grupy (twórca = administrator)
+* Zapraszanie członków (email lub kod zaproszenia)
+* Role: admin, member, child
+* Administrator grupy ma dostęp do informacji o aktywności członków (rodzic widzi historię skanów dziecka, lider zespołu widzi co skanowali pracownicy)
+4.3. Analiza strony — KLUCZOWA FUNKCJONALNOŚĆ
+To najważniejszy endpoint w systemie. Odpowiada na pytanie: "Co ta strona o mnie zbiera i czy mogę jej zaufać?"
+Endpoint: POST /api/scan
+Request: URL strony (i opcjonalnie treść DOM pobrana przez wtyczkę — przyspiesza pracę, bo backend nie musi sam scrapować)
+Co dzieje się pod spodem:
+1. Sprawdzenie cache: backend patrzy do scanned_sites czy strona była analizowana.
+   * Jeśli last_analyzed_at < 24h temu → zwróć werdykt z bazy, koniec.
+   * Jeśli >= 24h temu → przejdź do pełnej analizy (patrz pkt 4.4 — refresh).
+   * Jeśli strony nie ma w bazie → przejdź do pełnej analizy.
+2. Pełna analiza (delegowana do serwisu AI, backend orkiestruje):
+   * Lokalizacja polityki prywatności i EULA: AI/scraper szuka na stronie linków typu "Privacy Policy", "EULA", "Regulamin", "Polityka prywatności" — w wielu językach. Pobiera treść tych podstron.
+   * Analiza polityki prywatności przez LLM: model czyta dokument i zwraca strukturę:
+      * Skrócony opis (2–3 zdania, język zrozumiały dla zwykłego użytkownika — bez prawniczego żargonu)
+      * Lista konkretnych kategorii zbieranych danych (np. "email", "numer telefonu", "lokalizacja GPS", "historia przeglądania", "dane karty płatniczej", "kontakty z urządzenia", "biometria")
+      * Kluczowe klauzule (czy sprzedają dane stronom trzecim, czy udostępniają reklamodawcom, czy przekazują poza UE)
+      * Lokalizacja przetwarzania danych (kraje)
+      * Lokalizacja siedziby firmy
+      * Czerwone flagi (np. "zgoda na sprzedaż danych firmom trzecim", "brak prawa do usunięcia konta", "zgoda na nagrywanie ekranu")
+   * Research o firmie w internecie: AI wyszukuje informacje historyczne o firmie/domenie:
+      * Czy były wycieki danych (data breaches)
+      * Czy firma była karana przez UODO / GDPR / FTC
+      * Negatywne newsy, kontrowersje
+      * Wiek domeny (świeża domena = czerwona flaga)
+   * Detekcja phishingu: heurystyki (typosquatting, świeżość domeny, certyfikat SSL, blacklisty) + scoring ML/LLM
+   * Wynik scoringowy: safe / suspicious / phishing + numerical score 0–100
+3. Zapis do bazy: wynik trafia do site_verdicts, privacy_policy_analyses, company_audits. last_analyzed_at ustawione na teraz.
+4. Zapis do historii: wpis do scan_history dla zalogowanego użytkownika.
+5. Response: kompletny werdykt zwracany do wtyczki / aplikacji webowej.
+Format response (przykład):
+json
+{
+  "url": "https://example.com",
+  "verdict": "suspicious",
+  "score": 42,
+  "summary": "Strona zbiera szeroki zakres danych osobowych i udostępnia je partnerom reklamowym. Firma była w przeszłości karana za naruszenia RODO.",
+  "data_collected": [
+    "email",
+    "numer telefonu",
+    "lokalizacja GPS",
+    "historia przeglądania",
+    "identyfikatory urządzenia"
+  ],
+  "red_flags": [
+    "Sprzedaż danych firmom trzecim bez wyraźnej zgody",
+    "Brak opcji usunięcia konta",
+    "Przekazywanie danych poza EOG"
+  ],
+  "company": {
+    "name": "Example Corp",
+    "headquarters_country": "US",
+    "data_processing_countries": ["US", "IN", "PH"]
+  },
+  "company_audit": {
+    "known_breaches": 2,
+    "regulatory_fines": 1,
+    "incidents_timeline": [...]
+  },
+  "last_analyzed_at": "2026-05-09T12:00:00Z"
+}
+4.4. Cache i refresh danych
+Zasada: brak cron joba odświeżającego wszystko hurtowo. Refresh jest lazy / on-demand.
+* Strona ma w bazie pole last_analyzed_at.
+* Kiedy ktokolwiek wchodzi na stronę i wtyczka woła /api/scan:
+   * Jeśli last_analyzed_at < 24h → zwracamy werdykt z cache, BEZ ponownej analizy.
+   * Jeśli last_analyzed_at >= 24h i ktoś faktycznie wszedł na stronę → uruchamiamy ponowną pełną analizę, aktualizujemy bazę, zwracamy świeży werdykt.
+* Strony, na które nikt nie wchodzi, nie są nigdy odświeżane — oszczędność kosztów AI.
+* Dla UX: jeśli odświeżenie trwa długo, można zwrócić użytkownikowi stary werdykt z flagą stale: true i zaktualizować w tle (do ustalenia z frontendem/wtyczką).
+4.5. Phishing block
+* Endpoint: GET /api/check-url?url=...
+* Szybkie sprawdzenie blacklisty (zoptymalizowane pod niskie opóźnienie — wtyczka woła to PRZED załadowaniem strony)
+* Sprawdza phishing_reports + zewnętrzne blacklisty (Google Safe Browsing, PhishTank)
+* Response: { blocked: boolean, reason?: string }
+4.6. Kontrola rodzicielska
+* Gdy użytkownik z rolą child w grupie trafi na stronę phishingową lub o niskim scoringu → zapis do parental_alerts
+* Endpointy dla administratora rodzicielskiego:
+   * Lista alertów
+   * Historia skanów podopiecznego
+   * Statystyki bezpieczeństwa
+* Notyfikacje (email lub push — do ustalenia)
+4.7. Wykrywanie wycieków danych
+Zasada działania: kontrolujemy co użytkownik sam przekazał stronie, która okazała się phishingowa lub niewiarygodna.
+Mechanizm:
+1. Wtyczka monitoruje formularze na stronach (input, submit) i loguje jakie kategorie danych użytkownik wpisał (nie wartości — kategorie: email, hasło, numer karty, PESEL, telefon).
+2. Wtyczka wysyła do backendu wpis: { user_id, site_url, submitted_data_categories: [...], timestamp } — zapis do submitted_data_log.
+3. Jeśli później strona zostanie zaklasyfikowana jako phishing/niewiarygodna (albo była nią już wtedy) → backend cofa się po historii submitted_data_log i alertuje użytkownika:
+
+"30 października przekazałeś tej stronie email i hasło. Strona jest phishingowa — zmień hasło wszędzie gdzie używasz tego samego."
+
+
+4. Endpoint: GET /api/leaks/me — zwraca listę przekazanych danych do podejrzanych stron, z czasem i typem danych.
+5. Endpoint: POST /api/submitted-data — wtyczka loguje co użytkownik wpisał (tylko kategorie, nigdy wartości).
+WAŻNE bezpieczeństwo: backend nigdy nie przyjmuje i nie zapisuje wartości wpisanych danych. Tylko kategorie. Hasło użytkownika nigdy nie opuszcza jego przeglądarki.
+4.8. Dashboard i statystyki
+Endpointy zwracające zagregowane dane do dashboardu w aplikacji webowej:
+   * Liczba zeskanowanych stron, zablokowanych, alertów
+   * Historia skanów (paginacja)
+   * Top zagrożenia z ostatnich 30 dni
+   * Dane do mapy sprzedaży danych — lista krajów + firm + ile danych użytkownika tam trafiło (agregacja z privacy_policy_analyses i submitted_data_log)
+   * Dane do audytu firmy — oś czasu incydentów, licznik wycieków, źródła
+5. Integracja z serwisem AI
+Backend nie wykonuje sam analizy — woła zewnętrzny mikroserwis AI (osobna część projektu, robi ją AI/Data Engineer).
+   * Komunikacja: REST (sync) dla szybkich zapytań + kolejka (async) dla cięższych analiz EULA i researchu firmy
+   * Kontrakt: zdefiniowany w Zod, współdzielony między backendem a serwisem AI
+   * Timeouty:
+   * szybkie sprawdzenie URL (phishing): do 2s
+   * pełna analiza strony: do 30s (synchronicznie) lub async przez kolejkę
+   * research firmy: zawsze async
+   * Fallback: jeśli AI nie odpowiada, backend zwraca podstawowy werdykt heurystyczny (np. tylko phishing check) z flagą partial: true
+6. Bezpieczeństwo
+   * Row Level Security w Supabase dla wszystkich tabel z danymi użytkowników
+   * Rate limiting na endpointach (szczególnie /api/scan — wtyczka może spamować)
+   * Walidacja każdego wejścia przez Zod
+   * CORS skonfigurowany pod konkretne origin: aplikacja webowa + ID wtyczki przeglądarkowej
+   * Sanityzacja URL-i przed zapisem
+   * Szyfrowanie wrażliwych danych w bazie
+   * Backend nigdy nie przyjmuje wartości danych z formularzy użytkownika — tylko kategorie (patrz 4.7)
+7. Deliverables backendu
+   1. Schema bazy w Supabase + migracje
+   2. RLS policies dla wszystkich tabel
+   3. API routes z pełnym kontraktem (Zod schema lub OpenAPI)
+   4. System auth zintegrowany z Supabase
+   5. Integracja z zewnętrznym serwisem AI (REST + kolejka)
+   6. Logika cache i lazy refresh (24h, on-demand)
+   7. Logika detekcji wycieków na podstawie submitted_data_log
+   8. Podstawowa dokumentacja endpointów
+   9. Testy integracyjne kluczowych flow (scan, auth, grupy, leak detection)
+8. Punkty styku z resztą projektu
+   * Wtyczka przeglądarkowa → woła /api/scan, /api/check-url, /api/submitted-data; używa tokenu Supabase Auth
+   * Frontend (Next.js) → woła endpointy dashboardu, grup, alertów, wycieków; używa tych samych typów TS (sugerowany monorepo z packages/types)
+   * Serwis AI → backend wywołuje go przez REST/kolejkę, dostarcza dane do zapisu w bazie
