@@ -61,6 +61,25 @@ let phishingBlockData = null;
 let phishingBlockObserver = null;
 let lastBlacklistCheckUrl = null;
 
+function dismissPhishingBlockOverlay() {
+  phishingBlockData = null;
+
+  if (phishingBlockObserver) {
+    phishingBlockObserver.disconnect();
+    phishingBlockObserver = null;
+  }
+
+  const host = document.getElementById(PHISHING_BLOCK_HOST_ID);
+  if (host) {
+    host.remove();
+  }
+
+  document.documentElement.style.removeProperty("overflow");
+  if (document.body) {
+    document.body.style.removeProperty("overflow");
+  }
+}
+
 function ensurePhishingBlockOverlay() {
   if (!phishingBlockData) return;
 
@@ -148,6 +167,47 @@ function ensurePhishingBlockOverlay() {
           font-weight: 600;
           word-break: break-word;
         }
+
+        .trust-button {
+          position: fixed;
+          right: 24px;
+          bottom: 24px;
+          min-height: 44px;
+          padding: 0 18px;
+          border: 1px solid rgba(254, 202, 202, 0.56);
+          border-radius: 8px;
+          background: rgba(255, 241, 242, 0.96);
+          color: #7f1d1d;
+          font-family: inherit;
+          font-size: 14px;
+          font-weight: 800;
+          cursor: pointer;
+          box-shadow: 0 16px 36px rgba(0, 0, 0, 0.34);
+        }
+
+        .trust-button:hover {
+          background: #ffffff;
+        }
+
+        .trust-button:focus-visible {
+          outline: 3px solid rgba(254, 202, 202, 0.76);
+          outline-offset: 3px;
+        }
+
+        @media (max-width: 520px) {
+          .screen {
+            padding: 20px;
+          }
+
+          .panel {
+            padding: 26px 20px;
+          }
+
+          .trust-button {
+            right: 16px;
+            bottom: 16px;
+          }
+        }
       </style>
       <div class="screen" role="alert" aria-live="assertive">
         <section class="panel">
@@ -156,8 +216,11 @@ function ensurePhishingBlockOverlay() {
           <p>This page appears on the phishing blacklist and has been blocked to protect your data.</p>
           <div class="meta"></div>
         </section>
+        <button type="button" class="trust-button">Zaufaj stronie</button>
       </div>
     `;
+
+    root.querySelector(".trust-button")?.addEventListener("click", dismissPhishingBlockOverlay);
   }
 
   if (document.body && host.parentNode !== document.body) {
