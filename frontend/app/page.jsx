@@ -120,6 +120,72 @@ export default function HomePage() {
         </div>
       </section>
 
+      <section className="section" id="pricing">
+        <div className="container">
+          <div className="section__header reveal" style={{ textAlign: "center", maxWidth: "600px", margin: "0 auto 48px" }}>
+            <div className="eyebrow" style={{ justifyContent: "center" }}>Pricing</div>
+            <h2>Simple SaaS Subscriptions</h2>
+            <p>We designed three unique plans tailored perfectly to the needs of our customers.</p>
+          </div>
+          <div className="section-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", alignItems: "stretch" }}>
+            {/* Free Plan */}
+            <div className="glass card hover:-translate-y-1 transition-transform duration-200" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              <div className="card__header">
+                <h3>Free</h3>
+                <div style={{ fontSize: "2.4rem", fontWeight: "700", marginTop: "8px", fontFamily: "var(--font-mono)" }}>$0<span style={{ fontSize: "1rem", fontWeight: "400", color: "var(--text-muted)", fontFamily: "var(--font-sans)" }}>/mo</span></div>
+              </div>
+              <div className="card__body" style={{ flex: 1 }}>
+                <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "12px" }}>
+                  <li style={{ display: "flex", gap: "8px", alignItems: "start" }}><svg width="20" height="20" fill="none" stroke="var(--accent)" strokeWidth="2" style={{ flexShrink: 0 }}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg> Limited scanning of new pages</li>
+                  <li style={{ display: "flex", gap: "8px", alignItems: "start" }}><svg width="20" height="20" fill="none" stroke="var(--accent)" strokeWidth="2" style={{ flexShrink: 0 }}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg> Restricted AI reports</li>
+                  <li style={{ display: "flex", gap: "8px", alignItems: "start" }}><svg width="20" height="20" fill="none" stroke="var(--accent)" strokeWidth="2" style={{ flexShrink: 0 }}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg> Access to known public data only</li>
+                </ul>
+              </div>
+              <div style={{ marginTop: "auto", paddingTop: "24px" }}>
+                <Link className="btn btn--glass" style={{ width: "100%", justifyContent: "center" }} href="/login">Get Started</Link>
+              </div>
+            </div>
+
+            {/* Pro Plan */}
+            <div className="glass card hover:-translate-y-1 transition-transform duration-200" style={{ display: "flex", flexDirection: "column", gap: "16px", borderColor: "rgba(110, 247, 199, 0.4)", position: "relative" }}>
+              <div className="chip--glass" style={{ position: "absolute", top: "24px", right: "24px", fontSize: "12px", color: "var(--accent)" }}>Popular</div>
+              <div className="card__header">
+                <h3>Pro</h3>
+                <div style={{ fontSize: "2.4rem", fontWeight: "700", marginTop: "8px", fontFamily: "var(--font-mono)" }}>$9<span style={{ fontSize: "1rem", fontWeight: "400", color: "var(--text-muted)", fontFamily: "var(--font-sans)" }}>/mo</span></div>
+              </div>
+              <div className="card__body" style={{ flex: 1 }}>
+                <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "12px" }}>
+                  <li style={{ display: "flex", gap: "8px", alignItems: "start" }}><svg width="20" height="20" fill="none" stroke="var(--accent)" strokeWidth="2" style={{ flexShrink: 0 }}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg> Unlimited access to AI analysis</li>
+                  <li style={{ display: "flex", gap: "8px", alignItems: "start" }}><svg width="20" height="20" fill="none" stroke="var(--accent)" strokeWidth="2" style={{ flexShrink: 0 }}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg> Access to advanced analytics dashboard</li>
+                  <li style={{ display: "flex", gap: "8px", alignItems: "start" }}><svg width="20" height="20" fill="none" stroke="var(--accent)" strokeWidth="2" style={{ flexShrink: 0 }}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg> Real-time data leak monitoring & alerts</li>
+                </ul>
+              </div>
+              <div style={{ marginTop: "auto", paddingTop: "24px" }}>
+                <Link className="btn btn--primary" style={{ width: "100%", justifyContent: "center" }} href="/login">Upgrade to Pro</Link>
+              </div>
+            </div>
+
+            {/* Enterprise Plan */}
+            <div className="glass card hover:-translate-y-1 transition-transform duration-200" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              <div className="card__header">
+                <h3>Enterprise / Schools</h3>
+                <div style={{ fontSize: "2.4rem", fontWeight: "700", marginTop: "8px", fontFamily: "var(--font-mono)" }}>Custom</div>
+              </div>
+              <div className="card__body" style={{ flex: 1 }}>
+                <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "12px" }}>
+                  <li style={{ display: "flex", gap: "8px", alignItems: "start" }}><svg width="20" height="20" fill="none" stroke="var(--accent)" strokeWidth="2" style={{ flexShrink: 0 }}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg> Flexible options for custom agreements</li>
+                  <li style={{ display: "flex", gap: "8px", alignItems: "start" }}><svg width="20" height="20" fill="none" stroke="var(--accent)" strokeWidth="2" style={{ flexShrink: 0 }}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg> Personalized Terms of Service</li>
+                  <li style={{ display: "flex", gap: "8px", alignItems: "start" }}><svg width="20" height="20" fill="none" stroke="var(--accent)" strokeWidth="2" style={{ flexShrink: 0 }}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg> Enterprise-grade priority support</li>
+                </ul>
+              </div>
+              <div style={{ marginTop: "auto", paddingTop: "24px" }}>
+                <Link className="btn btn--glass" style={{ width: "100%", justifyContent: "center" }} href="/login">Contact Us</Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section className="section">
         <div className="container">
           <div className="cta__card glass" style={{ textAlign: "center", padding: "64px 24px", display: "flex", flexDirection: "column", alignItems: "center", gap: "24px" }}>
