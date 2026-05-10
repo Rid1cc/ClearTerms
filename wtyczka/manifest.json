@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Privacy Policy Jina Gemini Analyzer",
+  "name": "ClearTerms AI Extension",
   "version": "1.0",
-  "description": "Finds a privacy policy, fetches it through Jina, and rates it with Gemini.",
+  "description": "Analyses company privacy policy and provides a clear summary and rating with a direct connection to the ClearTerms platform.",
   "icons": {
     "16": "logo.png",
     "32": "logo.png",
